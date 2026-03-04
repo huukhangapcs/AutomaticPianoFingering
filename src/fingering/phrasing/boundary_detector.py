@@ -176,10 +176,12 @@ class PhraseBoundaryDetector:
         boundary_threshold: float = BOUNDARY_THRESHOLD,
         time_sig_numerator: int = 4,
         min_phrase_notes: int = MIN_PHRASE_NOTES,
+        max_phrase_measures: int = 4,
     ):
         self.threshold = boundary_threshold
         self.time_sig_numerator = time_sig_numerator
         self.min_phrase_notes = min_phrase_notes
+        self.max_phrase_measures = max_phrase_measures
 
     def detect(self, notes: List[NoteEvent]) -> List[Phrase]:
         """
@@ -192,7 +194,7 @@ class PhraseBoundaryDetector:
             return []
 
         signals = self._compute_signals(notes)
-        boundaries = self._select_boundaries(signals, len(notes))
+        boundaries = self._select_boundaries(signals, len(notes), notes)
         phrases = self._build_phrases(notes, boundaries)
         return phrases
 
@@ -320,12 +322,16 @@ class PhraseBoundaryDetector:
         self,
         signals: List[PhraseBoundarySignal],
         total_notes: int,
+        notes: List[NoteEvent] = None,
     ) -> List[int]:
         """
         Select boundary indices from the scored signals.
 
-        Uses a non-maximum suppression approach: within a window of
-        MIN_PHRASE_NOTES, keep only the single strongest boundary.
+        Two passes:
+          1. Score-based: insert boundary wherever fused score >= threshold.
+          2. Force-split: any phrase exceeding max_phrase_measures is split
+             at the nearest measure boundary — fixes LH chord accompaniment
+             patterns that produce no natural boundary signals.
         """
         scored = [(s.boundary_score(), s.position) for s in signals]
 
@@ -344,7 +350,57 @@ class PhraseBoundaryDetector:
         if boundaries[-1] < total_notes:
             boundaries.append(total_notes)
 
+        # -----------------------------------------------------------
+        # Fix 1: Forced measure-based segmentation
+        # Re-scan: if any phrase segment spans > max_phrase_measures,
+        # insert hard splits at every max_phrase_measures interval.
+        # -----------------------------------------------------------
+        if notes is not None and self.max_phrase_measures > 0:
+            forced = self._force_measure_boundaries(boundaries, notes, total_notes)
+            boundaries = forced
+
         return sorted(set(boundaries))
+
+    def _force_measure_boundaries(
+        self,
+        boundaries: List[int],
+        notes: List[NoteEvent],
+        total_notes: int,
+    ) -> List[int]:
+        """
+        For any phrase segment longer than max_phrase_measures, insert
+        forced splits at every max_phrase_measures interval, aligned to
+        the nearest measure boundary in the note stream.
+        """
+        result = list(boundaries)
+        pairs = list(zip(sorted(result), sorted(result)[1:]))
+
+        for start_idx, end_idx in pairs:
+            if end_idx > total_notes or start_idx >= end_idx:
+                continue
+            seg_notes = notes[start_idx:end_idx]
+            if not seg_notes:
+                continue
+            seg_measures = seg_notes[-1].measure - seg_notes[0].measure + 1
+            if seg_measures <= self.max_phrase_measures:
+                continue
+
+            # Need to split — find measure boundaries within segment
+            split_every = self.max_phrase_measures
+            start_measure = seg_notes[0].measure
+            target_measures = [
+                start_measure + split_every * k
+                for k in range(1, int(seg_measures / split_every) + 1)
+            ]
+            for target_m in target_measures:
+                # Find note index closest to start of target_measure
+                for j in range(start_idx, end_idx):
+                    if notes[j].measure >= target_m:
+                        if j not in result:
+                            result.append(j)
+                        break
+
+        return sorted(set(result))
 
     def _build_phrases(
         self,

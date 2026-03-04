@@ -45,6 +45,38 @@ def is_ascending(note_a: NoteEvent, note_b: NoteEvent) -> bool:
     return note_b.pitch > note_a.pitch
 
 
+def natural_finger_order(f_prev: int, f_curr: int, ascending: bool, hand: str) -> bool:
+    """
+    Returns True if (f_prev -> f_curr) is the natural anatomical finger order
+    for the given melodic direction and hand.
+
+    Right Hand:
+      ascending  = thumb (1) → pinky (5): f_curr > f_prev is natural
+      descending = pinky (5) → thumb (1): f_curr < f_prev is natural
+
+    Left Hand (mirror image on keyboard):
+      ascending (pitch goes up) = pinky-side moves right on keyboard
+        → the LH thumb is on the HIGH pitch side
+        → natural order ascending: f_curr < f_prev (5→4→3→2→1)
+      descending: f_curr > f_prev is natural for LH
+    """
+    if hand == 'right':
+        return (ascending and f_curr > f_prev) or (not ascending and f_curr < f_prev)
+    else:  # left hand
+        return (ascending and f_curr < f_prev) or (not ascending and f_curr > f_prev)
+
+
+def thumb_crossing_natural(f_prev: int, f_curr: int, ascending: bool, hand: str) -> bool:
+    """
+    Returns True if f_curr == 1 (thumb) crossing is the standard scale motion
+    (thumb-under for RH ascending, thumb-under for LH descending).
+    """
+    if hand == 'right':
+        return f_curr == 1 and ascending
+    else:
+        return f_curr == 1 and not ascending
+
+
 def semitone_interval(note_a: NoteEvent, note_b: NoteEvent) -> int:
     """Signed semitone interval (positive = ascending)."""
     return note_b.pitch - note_a.pitch

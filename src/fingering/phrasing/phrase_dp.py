@@ -18,9 +18,12 @@ import numpy as np
 
 from fingering.models.note_event import NoteEvent
 from fingering.core.keyboard import (
-    white_key_span, finger_span_limits, is_ascending
+    white_key_span, finger_span_limits, is_ascending,
+    natural_finger_order, thumb_crossing_natural,
 )
 from fingering.phrasing.phrase import Phrase, PhraseIntent
+from fingering.phrasing.pattern_library import apply_pattern_constraints
+from fingering.phrasing.chord_heuristic import build_forced_constraints
 
 # ---- Finger classification ----
 STRONG_FINGERS = {2, 3}       # Most reliable, good touch control
@@ -68,32 +71,60 @@ class PhraseScopedDP:
         """
         Return a list of finger assignments (1–5) for each note in phrase.
 
+        Priority order for forced assignments:
+          1. Chord heuristic (Fix 3) — chord notes must be assigned together
+          2. Pattern Library (Fix 2) — scale/arpeggio patterns get standard fingering
+          3. Stitch constraint       — first finger constrained by cross-phrase stitch
+          4. Viterbi DP              — remaining degrees of freedom
+
         stitch_constraint: {'allowed_first_fingers': [1,2,3,…]}
         """
         notes = phrase.notes
         n = len(notes)
+        hand  = phrase.hand
         if n == 0:
             return []
         if n == 1:
             return [self._best_single_finger(notes[0], phrase)]
 
+        # -----------------------------------------------------------
+        # Build forced constraints dict: note_idx -> fixed_finger
+        # Fix 2: Pattern Library (scale/arpeggio)
+        # Fix 3: Chord Heuristic (simultaneous notes)
+        # Chord heuristic applied LAST so it overrides pattern library
+        # for chord notes.
+        # -----------------------------------------------------------
+        forced: Dict[int, int] = {}
+        forced = apply_pattern_constraints(notes, hand, forced)       # Fix 2
+        forced = build_forced_constraints(notes, hand, forced)        # Fix 3
+
         dp   = np.full((n, N_FINGERS + 1), INF)
         prev = np.zeros((n, N_FINGERS + 1), dtype=int)
 
         # --- Initialise first note ---
-        allowed = (
+        allowed_first = (
             stitch_constraint.get('allowed_first_fingers', list(range(1, 6)))
             if stitch_constraint else list(range(1, 6))
         )
-        for f in allowed:
+        # Stitch constraint (cross-phrase) takes PRIORITY over pattern library
+        # for the first note. Only use pattern library forced[0] when there
+        # is no cross-phrase constraint restricting the first finger.
+        if 0 in forced and not stitch_constraint:
+            allowed_first = [forced[0]]
+
+        for f in allowed_first:
             dp[0, f] = self._init_cost(notes[0], f, phrase)
 
         # --- Fill DP table ---
         for i in range(1, n):
-            tension = phrase.tension_curve[i] if phrase.tension_curve else 0.5
+            tension   = phrase.tension_curve[i] if phrase.tension_curve else 0.5
             is_climax = (i == phrase.climax_idx)
 
-            for f_curr in range(1, 6):
+            # Forced constraint: only allow pinned finger at this position
+            forced_f = forced.get(i, None)
+            f_curr_range = [forced_f] if forced_f is not None else range(1, 6)
+
+            for f_curr in f_curr_range:
                 for f_prev in range(1, 6):
                     if dp[i - 1, f_prev] == INF:
                         continue
@@ -155,16 +186,24 @@ class PhraseScopedDP:
                 cost += PINKY_ON_BLACK
 
         # --- Ergonomic: crossing ---
+        hand = note_curr.hand
         crossing = False
         if ascending and f_curr < f_prev and f_curr != 1:
             crossing = True
         if not ascending and f_curr > f_prev and f_prev != 1:
             crossing = True
+        # For LH: mirror the crossing logic
+        if hand == 'left':
+            crossing = False
+            if not ascending and f_curr < f_prev and f_curr != 1:
+                crossing = True
+            if ascending and f_curr > f_prev and f_prev != 1:
+                crossing = True
         if crossing:
             if f_curr == 1 and note_curr.is_black:
                 cost += CROSSING_STANDARD + 4.0
-            elif f_curr == 1:
-                cost += CROSSING_THUMB_UNDER  # Normal scale thumb under
+            elif thumb_crossing_natural(f_prev, f_curr, ascending, hand):
+                cost += CROSSING_THUMB_UNDER  # Standard scale thumb motion
             else:
                 cost += CROSSING_STANDARD
 
@@ -175,9 +214,7 @@ class PhraseScopedDP:
                 cost += LEGATO_BREAK_PENALTY
 
         # --- Ergonomic: direction alignment reward ---
-        natural_asc  = ascending  and f_curr > f_prev
-        natural_desc = (not ascending) and f_curr < f_prev
-        if natural_asc or natural_desc:
+        if natural_finger_order(f_prev, f_curr, ascending, note_curr.hand):
             cost += DIRECTION_REWARD
 
         # -----------------------------------------------------------
@@ -204,13 +241,12 @@ class PhraseScopedDP:
                 cost += CLIMAX_STRONG_REWARD
 
         # -----------------------------------------------------------
-        # Tension arc alignment
-        # When tension is high (approaching climax), reward natural
-        # finger order that matches the melodic direction.
+        # Tension arc alignment — hand-aware
         # -----------------------------------------------------------
         if tension > 0.5:
-            misaligned = (ascending and f_curr < f_prev and f_curr != 1)
-            if misaligned:
+            misaligned = not natural_finger_order(f_prev, f_curr, ascending, note_curr.hand)
+            # Don't penalize thumb-under (it's a special move, not misalignment)
+            if misaligned and not thumb_crossing_natural(f_prev, f_curr, ascending, note_curr.hand):
                 cost += ARC_MISALIGN_PENALTY * tension
 
         return max(cost, 0.0)

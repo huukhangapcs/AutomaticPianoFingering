@@ -2,6 +2,9 @@
 Lightweight MusicXML reader — parses pitch/duration/fingering/slur/dynamics
 from a MusicXML file without requiring music21.
 
+Supports both single-staff and grand staff (2-staff piano) scores.
+Staff 1 → right hand ('right'), Staff 2 → left hand ('left').
+
 Uses only stdlib xml.etree.ElementTree.
 """
 
@@ -24,19 +27,40 @@ def _step_to_midi(step: str, alter: int, octave: int) -> int:
 
 class MusicXMLReader:
     """
-    Parses a MusicXML file and returns a list of NoteEvents.
+    Parses a MusicXML file and returns NoteEvents.
 
-    Handles:
-      - Single-staff scores (treble clef)
-      - Rests (skipped)
-      - Slur start/stop/continue
-      - Staccato, accent, tenuto notations
-      - Fingering (existing annotations stored in note.finger as ground truth)
-      - Key/time signature, tempo, divisions
-      - Dynamic words (pp, mf, f, etc.)
+    Grand staff support:
+      - <staff>1</staff> → hand='right'
+      - <staff>2</staff> → hand='left'
+      - <backup> elements correctly reset the timekeeper per staff
+
+    Handles: rests, slurs, staccato/accent/tenuto, fingering GT,
+             key/time signature, tempo, divisions, dynamic words.
     """
 
+    def parse_grand_staff(self, path: str) -> Tuple[List[NoteEvent], List[NoteEvent]]:
+        """
+        Parse a grand staff (2-staff piano score) into separate RH and LH lists.
+
+        Returns: (right_hand_notes, left_hand_notes)
+        Both lists are sorted by onset time.
+        """
+        all_notes = self._parse_all(path)
+        rh = [n for n in all_notes if n.hand == 'right']
+        lh = [n for n in all_notes if n.hand == 'left']
+        return rh, lh
+
     def parse(self, path: str, hand: str = 'right') -> List[NoteEvent]:
+        """
+        Parse a single-staff file, tagging all notes with the given hand.
+        For grand staff files use parse_grand_staff() instead.
+        """
+        notes = self._parse_all(path)
+        for n in notes:
+            n.hand = hand  # Force override for single-staff use
+        return notes
+
+    def _parse_all(self, path: str) -> List[NoteEvent]:
         tree = ET.parse(path)
         root = tree.getroot()
 
@@ -49,16 +73,21 @@ class MusicXMLReader:
             return f'{ns}{name}'
 
         notes: List[NoteEvent] = []
-        divisions = 1          # MusicXML duration units per quarter note
-        current_beat_time = 0.0   # Running time in quarter-note beats
+        divisions = 1
         current_measure = 0
         current_dynamic = 'mf'
-        open_slurs: dict[str, bool] = {}  # slur_number → currently open
+        open_slurs: dict[str, bool] = {}
+        # Per-staff time tracking — persists across ALL measures
+        # staff_time[staff_num]        = current beat position
+        # measure_beat_start[staff_num] = beat position at start of current measure
+        staff_time: dict[str, float]        = {}
+        measure_beat_start: dict[str, float] = {}
 
         for measure_el in root.iter(tag('measure')):
             current_measure += 1
-            measure_beat_start = current_beat_time
-            beat_in_measure = 1.0
+            # Reset measure_beat_start to current positions at start of each measure
+            for sn in staff_time:
+                measure_beat_start[sn] = staff_time[sn]
 
             for child in measure_el:
                 local = child.tag.replace(ns, '')
@@ -77,14 +106,33 @@ class MusicXMLReader:
                                 current_dynamic = d
                                 break
 
+                # --- <backup>: rewind time cursor for new staff ---
+                if local == 'backup':
+                    # <backup> rewrites the time position — we just note it and let
+                    # per-staff tracking handle positioning.
+                    pass
+
                 # --- Note element ---
                 if local == 'note':
-                    # Skip rests
+                    # Determine staff number → hand
+                    staff_el = child.find(tag('staff'))
+                    staff_num = staff_el.text if staff_el is not None else '1'
+                    hand = 'right' if staff_num == '1' else 'left'
+
+                    # Initialise per-staff time cursor on first encounter in this score
+                    if staff_num not in staff_time:
+                        staff_time[staff_num] = 0.0
+                        measure_beat_start[staff_num] = 0.0
+
+                    t = staff_time[staff_num]
+
+                    # Skip rests — advance time
                     if child.find(tag('rest')) is not None:
                         dur_el = child.find(tag('duration'))
                         if dur_el is not None:
                             beats = int(dur_el.text) / divisions
-                            current_beat_time += beats
+                            if child.find(tag('chord')) is None:
+                                staff_time[staff_num] = t + beats
                         continue
 
                     # Pitch
@@ -101,14 +149,13 @@ class MusicXMLReader:
                     dur_el = child.find(tag('duration'))
                     dur_beats = int(dur_el.text) / divisions if dur_el is not None else 0.5
 
-                    # Chord: starts at same time as previous note
+                    # Chord: starts at same time as previous note of same staff
                     is_chord = child.find(tag('chord')) is not None
-                    note_onset = current_beat_time if not is_chord else (
-                        current_beat_time - (notes[-1].duration if notes else 0)
-                    )
+                    note_onset = t if not is_chord else max(t - dur_beats, 0.0)
 
                     # Beat within measure
-                    beat_in_meas = note_onset - measure_beat_start + 1.0
+                    mbs = measure_beat_start.get(staff_num, 0.0)
+                    beat_in_meas = note_onset - mbs + 1.0
 
                     # Notations
                     slur_start = slur_end = False
@@ -165,7 +212,10 @@ class MusicXMLReader:
                     )
                     notes.append(note)
 
+                    # Advance this staff's time cursor
                     if not is_chord:
-                        current_beat_time += dur_beats
+                        staff_time[staff_num] = note_onset + dur_beats
 
+        # Sort by onset then by hand (right before left) for consistent order
+        notes.sort(key=lambda n: (n.onset, 0 if n.hand == 'right' else 1))
         return notes
