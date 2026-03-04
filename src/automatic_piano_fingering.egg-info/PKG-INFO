@@ -1,0 +1,15 @@
+Metadata-Version: 2.4
+Name: automatic-piano-fingering
+Version: 0.1.0
+Summary: Automatic piano fingering that thinks like a real pianist
+Requires-Python: >=3.10
+Requires-Dist: music21>=9.1
+Requires-Dist: numpy>=1.26
+Requires-Dist: dataclasses-json>=0.6
+Provides-Extra: neural
+Requires-Dist: torch>=2.2; extra == "neural"
+Requires-Dist: torchcrf>=1.1; extra == "neural"
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0; extra == "dev"
+Requires-Dist: pytest-cov>=5.0; extra == "dev"
+Requires-Dist: ruff>=0.4; extra == "dev"
