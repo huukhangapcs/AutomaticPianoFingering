@@ -62,6 +62,19 @@ SHORT_STEP_CROSSING_PENALTY = 2.5  # Penalty cho crossing không cần thiết (
 # thì không cần di chuyển bàn tay. Đây là fingering tự nhiên nhất.
 SEQUENTIAL_STEPWISE_REWARD = -2.0  # Reward mạnh cho liền-bậc-liền-ngón
 
+# ── Large leap handling ─────────────────────────────────────────
+# Khi span > 6 white keys (quảng 7 hoặc rộng hơn), pianist không stretch
+# mà reposition bàn tay. Span formula o^2 * w không còn dùng được.
+# Thay bằng:
+#   LARGE_LEAP_REPOSITION_COST: fixed cost thể hiện bàn tay phải nhảy
+#   LARGE_LEAP_ANCHOR_REWARD: reward cho “landing anchor” đúng — khi descend
+#     large, nên land bằng thumb (f=1) hoặc index (f=2) để tiếp tục chuyển
+#     lên dễ; khi ascend large, nên land bằng ring/pinky (f=4/5) hoặc middle
+#     (f=3) để bàn tay đi xuống dễ.
+LARGE_LEAP_THRESHOLD    = 6    # white keys (~quảng 6 trở lên)
+LARGE_LEAP_REPOSITION_COST = 4.0  # Chi phí cố định khi reposition
+LARGE_LEAP_ANCHOR_REWARD = -3.0   # Reward cho landing finger phù hợp với hướng leap
+
 # ── Phase 4: OFF_BY_ONE fix ──────────────────────────────────────────────
 # Bias correction: DP systematically under-estimates finger number.
 # 67.8% of OFF_BY_ONE cases are GT > Pred (predicted too LOW).
@@ -255,10 +268,25 @@ class PhraseScopedDP:
         bpm = getattr(note_curr, 'tempo', 120.0) or 120.0
         adjusted_max = tempo_adjusted_max_span(f_prev, f_curr, bpm)
 
-        # ── Ergonomic: stretch ────────────────────────────────────
-        # Use effective_span vs tempo-adjusted max
+        # ── Ergonomic: stretch vs large leap ─────────────────────────────
+        # For small intervals: standard quadratic stretch penalty.
+        # For LARGE LEAPS (> 6 white keys, ~a 6th+): pianist repositions the hand
+        # rather than stretching. Different cost model applies.
         over = max(0.0, effective_span - adjusted_max)
-        cost += over ** 2 * STRETCH_WEIGHT
+
+        if span > LARGE_LEAP_THRESHOLD:
+            # Fixed repositioning cost (hand must jump, regardless of which fingers)
+            cost += LARGE_LEAP_REPOSITION_COST
+            # Landing anchor reward: good choice of f_curr after a big leap
+            # makes the subsequent passage easier.
+            # Descending large leap → land low finger (1, 2) = pivot for going back up
+            # Ascending large leap  → land mid/high finger (3, 4, 5) = pivot for going down
+            if ascending and f_curr in (3, 4, 5):
+                cost += LARGE_LEAP_ANCHOR_REWARD   # reward
+            elif not ascending and f_curr in (1, 2):
+                cost += LARGE_LEAP_ANCHOR_REWARD   # reward
+        else:
+            cost += over ** 2 * STRETCH_WEIGHT
 
         # ── Phase 3B: Hand position shift cost ───────────────────────────
         # Penalises large hand repositioning (pianist avoids unnecessary shifts).
