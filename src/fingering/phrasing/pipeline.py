@@ -151,16 +151,10 @@ class PhraseAwareFingering:
         score_profile = build_score_profile(rh, lh, tonic_pc_override=self.tonic_pc)
 
         if is_left_hand:
-            # ----- Left Hand: Segment strictly by measure -----
-            boundaries = []
-            for i in range(len(notes) - 1):
-                if notes[i].measure != notes[i + 1].measure:
-                    boundaries.append(i)
-            # Add the final note as the end of the last phrase
-            if not boundaries or boundaries[-1] != len(notes) - 1:
-                boundaries.append(len(notes) - 1)
-                
-            phrases = self.detector._build_phrases_from_indices(notes, boundaries)
+            # ----- Left Hand: Pattern-Aware Segmentation (Phase 3C) -----
+            # Pianist thinks of LH accompaniment in harmonic units (2-4 measures),
+            # not individual measures. Group by detected patterns first.
+            phrases = self._segment_lh_pattern_aware(notes)
             return phrases
 
         # ----- Right Hand: Full Phrase Segmentation -----
@@ -236,3 +230,81 @@ class PhraseAwareFingering:
             prev_fingering = fingering
 
         return all_fingering
+
+    # ──────────────────────────────────────────────────────────────
+    # Phase 3C: LH Pattern-Aware Segmentation
+    # ──────────────────────────────────────────────────────────────
+
+    def _segment_lh_pattern_aware(self, notes: List[NoteEvent]) -> List[Phrase]:
+        """
+        Segment the Left Hand using detected accompaniment patterns.
+
+        Pianist thinking: LH accompaniment is thought of in harmonic units —
+        e.g., one Alberti cycle per measure, one waltz unit per beat group.
+        The hand stays in position for the whole pattern unit, so segmenting
+        at pattern boundaries (not arbitrary measure lines) is more natural.
+
+        Strategy:
+          1. Detect Alberti, waltz, arpeggio, and partial-scale patterns via PatternLibrary.
+          2. Group detected pattern units into phrases of 2–4 measures.
+          3. If no pattern is detected (e.g., single bass notes or chords), fall back to
+             segmenting every 2 measures (more natural than every 1 measure).
+
+        Returns:
+            List[Phrase] — LH phrases sized by musical unit, not measure lines.
+        """
+        from fingering.phrasing.pattern_library import PatternLibrary
+        from fingering.phrasing.boundary_detector import detect_arc_type
+
+        if not notes:
+            return []
+
+        n = len(notes)
+        lib = PatternLibrary()
+
+        # ── Step 1: Detect all LH patterns ──────────────────────────────
+        matches = lib.find_all(notes, hand='left')
+        lh_patterns = {
+            m.pattern for m in matches
+            if m.pattern in ('alberti_bass', 'waltz_bass', 'arpeggio_asc', 'arpeggio_desc')
+        }
+
+        has_accompaniment_pattern = bool(lh_patterns)
+
+        # ── Step 2: Determine phrase grouping size ───────────────────────
+        # Group measures: Alberti uses 4-note units (1 per beat × 4 = 1 measure typically)
+        # → natural phrase = 2 measures of Alberti
+        # Waltz uses 3-note units (1 per beat × 3 = 1 measure in 3/4)
+        # → natural phrase = 2 measures of waltz
+        # No pattern → 2-measure grouping (double the original 1-measure cut)
+        if 'alberti_bass' in lh_patterns or 'waltz_bass' in lh_patterns:
+            phrase_measure_size = 2   # One harmonic unit = 2 measures
+        else:
+            phrase_measure_size = 2   # Default: 2-measure groups (better than 1)
+
+        # ── Step 3: Build measures list ──────────────────────────────────
+        # Collect unique measure numbers and their note ranges
+        measures: dict[int, list] = {}
+        for i, note in enumerate(notes):
+            m = note.measure
+            if m not in measures:
+                measures[m] = []
+            measures[m].append(i)
+
+        sorted_measures = sorted(measures.keys())
+
+        # ── Step 4: Group measures into phrases ──────────────────────────
+        # Collect boundaries: last note index of each phrase group
+        boundary_indices: list[int] = []
+        for group_start in range(0, len(sorted_measures), phrase_measure_size):
+            group_end = min(group_start + phrase_measure_size, len(sorted_measures))
+            last_measure = sorted_measures[group_end - 1]
+            last_note_idx = max(measures[last_measure])
+            boundary_indices.append(last_note_idx)
+
+        # Ensure we always end at the last note
+        if not boundary_indices or boundary_indices[-1] != n - 1:
+            boundary_indices.append(n - 1)
+
+        return self.detector._build_phrases_from_indices(notes, boundary_indices)
+

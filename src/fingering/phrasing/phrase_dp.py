@@ -25,6 +25,10 @@ from fingering.core.keyboard import (
 from fingering.phrasing.phrase import Phrase, PhraseIntent
 from fingering.phrasing.pattern_library import apply_pattern_constraints
 from fingering.phrasing.chord_heuristic import build_forced_constraints
+from fingering.phrasing.thumb_placement_planner import apply_thumb_constraints
+from fingering.phrasing.hand_position import HandPositionTracker, apply_five_finger_constraints
+
+_hand_tracker = HandPositionTracker()  # Stateless, shared instance
 
 # ---- Finger classification ----
 STRONG_FINGERS = {2, 3}       # Most reliable, good touch control
@@ -37,12 +41,13 @@ WEAK_PAIR_PENALTY   = 3.0    # Extra penalty for 3-4-5 finger combos
 THUMB_ON_BLACK      = 5.0    # Thumb on black key
 PINKY_ON_BLACK      = 2.5    # Pinky on black key
 CROSSING_STANDARD   = 2.5    # Finger crossing (non-scale contexts)
-CROSSING_THUMB_UNDER = 1.0   # Thumb-under (standard in scales) — low
-THUMB_UNDER_REWARD  = -1.5   # Extra reward when thumb-under is scale-correct
-FINGER_OVER_REWARD  = -1.2   # Reward for correct finger-over (descending RH or ascending LH)
+CROSSING_THUMB_UNDER = 2.5   # Thumb-under (raised from 1.0 — prevents 1-2-1-2 spam)
+THUMB_UNDER_REWARD  = -2.5   # Extra reward when thumb-under is scale-correct (stronger to compensate raise)
+FINGER_OVER_REWARD  = -1.8   # Reward for correct finger-over (descending RH or ascending LH)
 FINGER_OVER_PENALTY = 2.0    # Penalty for wrong-direction finger-over
 OFOK_PENALTY        = 12.0   # Same finger, different pitch (legato break)
 DIRECTION_REWARD    = -1.0   # Natural finger order alignment
+REPEATED_THUMB_PENALTY = 6.0 # Rapid thumb reuse: thumb appearing after only 1-2 intervening fingers
 
 # ---- Intent modifiers ----
 LEGATO_SUBST_REWARD  = -3.0   # Finger substitution in legato context
@@ -101,6 +106,10 @@ class PhraseScopedDP:
         forced: Dict[int, int] = {}
         forced = apply_pattern_constraints(notes, hand, forced)       # Fix 2
         forced = build_forced_constraints(notes, hand, forced)        # Fix 3
+        forced = apply_thumb_constraints(notes, hand, forced)         # Phase 3A: thumb planner
+        # Phase 3B: five-finger bypass — skip climax note so DP can pick strong finger there
+        climax_skip = {phrase.climax_idx} if phrase.climax_idx is not None else set()
+        forced = apply_five_finger_constraints(notes, hand, forced, skip_indices=climax_skip)
 
         dp   = np.full((n, N_FINGERS + 1), INF)
         prev = np.zeros((n, N_FINGERS + 1), dtype=int)
@@ -172,6 +181,15 @@ class PhraseScopedDP:
         span = white_key_span(note_prev, note_curr)
         ascending = is_ascending(note_prev, note_curr)
 
+        # ── Phase 3A: Repeated-thumb penalty ─────────────────────────────
+        # Penalize thumb appearing immediately after thumb (1→X→1 within 2 notes).
+        # This prevents the DP from choosing 1-2-1-2 patterns over correct
+        # 3-4-5/2-3-4 runs. Only fires when prev was also thumb and curr is thumb.
+        # Exception: allowed in legato context (finger substitution involves thumb).
+        if f_curr == 1 and f_prev == 1 and note_prev.pitch != note_curr.pitch:
+            if intent not in (PhraseIntent.LEGATO, PhraseIntent.CANTABILE):
+                cost += REPEATED_THUMB_PENALTY
+
         # ── Biomechanics: black key geometry correction ────────────────────
         # Black keys are physically closer → effective span is smaller
         bk_correction = black_key_span_correction(note_prev, note_curr)
@@ -185,6 +203,12 @@ class PhraseScopedDP:
         # Use effective_span vs tempo-adjusted max
         over = max(0.0, effective_span - adjusted_max)
         cost += over ** 2 * STRETCH_WEIGHT
+
+        # ── Phase 3B: Hand position shift cost ───────────────────────────
+        # Penalises large hand repositioning (pianist avoids unnecessary shifts).
+        pos_prev = _hand_tracker.infer(note_prev, f_prev)
+        pos_curr = _hand_tracker.infer(note_curr, f_curr)
+        cost += _hand_tracker.shift_cost(pos_prev, pos_curr)
 
         # --- Ergonomic: weak finger pair ---
         pair = (min(f_prev, f_curr), max(f_prev, f_curr))

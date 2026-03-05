@@ -72,6 +72,15 @@ _HANON_5_DESCENDING_RH = [5, 4, 3, 2, 1]
 _HANON_5_ASCENDING_LH  = [5, 4, 3, 2, 1]
 _HANON_5_DESCENDING_LH = [1, 2, 3, 4, 5]
 
+# Alberti bass (LH only): root - 5th - 3rd - 5th repeating
+# Intervals: root→5th = +7, 5th→3rd = -4, 3rd→5th = +4
+_LH_ALBERTI_BASS_UNIT  = [5, 2, 3, 2]    # One full Alberti unit (4 notes)
+
+# Waltz bass (LH only): root - chord - chord
+# Intervals vary (3rd/5th/6th), recognized by root on beat 1
+# Standard: 5 on root, then 2-1 or 3-2 on the chord notes
+_LH_WALTZ_BASS_UNIT  = [5, 2, 1]   # Root + 2-note chord (3-note waltz unit)
+
 
 @dataclass
 class PatternMatch:
@@ -144,6 +153,9 @@ class PatternLibrary:
                 or self._try_scale(notes, i, hand, _PENTATONIC_STEPS, 'pentatonic')
                 # Arpeggio
                 or self._try_arpeggio(notes, i, hand)
+                # LH accompaniment patterns (before Hanon, more specific)
+                or self._try_alberti_bass(notes, i, hand)
+                or self._try_waltz_bass(notes, i, hand)
                 # Hanon 5-finger (before scalar run for higher priority)
                 or self._try_hanon(notes, i, hand)
                 # Partial scale (4–7 notes) — fallback, higher min_len to reduce false positives
@@ -367,6 +379,142 @@ class PatternLibrary:
             pattern=f"hanon5_{'asc' if ascending else 'desc'}",
             fingers=fingers,
             confidence=0.85,
+        )
+
+
+    def _try_alberti_bass(
+        self,
+        notes: List[NoteEvent],
+        start: int,
+        hand: str,
+    ) -> Optional[PatternMatch]:
+        """
+        Detect Alberti bass pattern (LH only): root - 5th - 3rd - 5th repeating.
+
+        Characteristic intervals (semitones):
+          root → 5th:  +7
+          5th  → 3rd:  -4  (major) or -3 (minor)
+          3rd  → 5th:  +4  (major) or +3 (minor)
+          5th  → root: -7  (or repeats)
+
+        Detects 1 or more full units (4 notes each).
+        Standard fingering: 5 - 2 - 3 - 2 (repeating).
+
+        Example: C2 G2 E2 G2 C2 G2 E2 G2 → [5,2,3,2,5,2,3,2]
+        """
+        if hand != 'left':
+            return None
+
+        n = len(notes)
+        # Need at least 4 notes for one Alberti unit
+        if start + 4 > n:
+            return None
+
+        def _is_alberti_unit(idx: int) -> bool:
+            """Check if 4 notes at idx form an Alberti unit."""
+            if idx + 4 > n:
+                return False
+            steps = _intervals(notes, idx, 4)  # 3 intervals for 4 notes
+            i0, i1, i2 = steps
+            # root → 5th = +7
+            if i0 != 7:
+                return False
+            # 5th → 3rd = -4 (major) or -3 (minor)
+            if i1 not in (-4, -3):
+                return False
+            # 3rd → 5th = +4 (major) or +3 (minor) — must be positive and match i1 sign
+            if i2 not in (4, 3) or i2 != -i1:
+                return False
+            return True
+
+        if not _is_alberti_unit(start):
+            return None
+
+        # Count how many consecutive Alberti units follow
+        length = 4
+        while start + length + 4 <= n and _is_alberti_unit(start + length):
+            # Check the 5th → root transition between units is valid
+            # (The last note of unit N should be 5th, same as start of next unit's root)
+            # We allow any root at the start of next unit.
+            length += 4
+
+        fingers = (_LH_ALBERTI_BASS_UNIT * ((length // 4) + 1))[:length]
+
+        return PatternMatch(
+            start_idx=start,
+            end_idx=start + length,
+            pattern='alberti_bass',
+            fingers=fingers,
+            confidence=1.0,
+        )
+
+    def _try_waltz_bass(
+        self,
+        notes: List[NoteEvent],
+        start: int,
+        hand: str,
+    ) -> Optional[PatternMatch]:
+        """
+        Detect waltz bass pattern (LH only): root - chord - chord (3-note unit).
+
+        Characteristic:
+          - Note at beat 1 is the root (lowest pitch in the unit)
+          - Notes at beat 2 and 3 are chord tones above root (3rd/5th intervals)
+          - Both chord tones are higher than root
+          - Interval between chord tones: 2-4 semitones (a 3rd)
+
+        Standard fingering: 5 (root) - 2 - 1  (or 5 - 3 - 1 for wider spread)
+
+        Example: C2 E3 G3 C2 E3 G3 → [5,2,1,5,2,1]
+        """
+        if hand != 'left':
+            return None
+
+        n = len(notes)
+        if start + 3 > n:
+            return None
+
+        def _is_waltz_unit(idx: int) -> bool:
+            """Check if 3 notes at idx form a waltz bass unit."""
+            if idx + 3 > n:
+                return False
+            root = notes[idx].pitch
+            chord1 = notes[idx + 1].pitch
+            chord2 = notes[idx + 2].pitch
+            # Both chord tones must be higher than root
+            if chord1 <= root or chord2 <= root:
+                return False
+            # Root must be the lowest of the three
+            if not (root < chord1 and root < chord2):
+                return False
+            # Interval from root to chord1: typical 3rd/4th/5th (3-7 semitones)
+            int1 = chord1 - root
+            if not (3 <= int1 <= 8):
+                return False
+            # Interval between chord tones: a 3rd or 4th (2-5 semitones)
+            int2 = abs(chord2 - chord1)
+            if not (2 <= int2 <= 5):
+                return False
+            return True
+
+        if not _is_waltz_unit(start):
+            return None
+
+        # Count consecutive waltz units
+        length = 3
+        while start + length + 3 <= n and _is_waltz_unit(start + length):
+            length += 3
+
+        # Fingering: 5 on root, then 2 and 1 on chord tones
+        unit_f = _LH_WALTZ_BASS_UNIT
+        fingers = (unit_f * ((length // 3) + 1))[:length]
+
+        return PatternMatch(
+            start_idx=start,
+            end_idx=start + length,
+            pattern='waltz_bass',
+            fingers=fingers,
+            confidence=0.9,
         )
 
 

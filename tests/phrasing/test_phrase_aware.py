@@ -424,3 +424,140 @@ class TestPhraseAwarePipeline:
         result = paf.run(notes)
         assert len(result) == 1
         assert 1 <= result[0] <= 5
+
+
+# ─────────────────────────────────────────────
+# Phase 3A — ThumbPlacementPlanner
+# ─────────────────────────────────────────────
+
+class TestThumbPlacementPlanner:
+    """Tests for the new ThumbPlacementPlanner (Phase 3A)."""
+
+    def _stepwise_run(self, start_pitch=60, n=8, hand='right') -> list[NoteEvent]:
+        """Create a purely stepwise (whole-step) run for testing."""
+        # Whole steps: 0,2,4,6,8,10 semitones
+        notes = []
+        for i in range(n):
+            notes.append(make_note(
+                pitch=start_pitch + i * 2,
+                onset=i * 0.5,
+                duration=0.5,
+                hand=hand,
+                measure=1 + i // 4,
+                beat=(i % 4) * 0.5 + 1.0,
+            ))
+        return notes
+
+    def test_planner_injects_thumb_in_ascending_run(self):
+        """Ascending stepwise run should get thumb forced at interval positions."""
+        from fingering.phrasing.thumb_placement_planner import ThumbPlacementPlanner
+        notes = self._stepwise_run(start_pitch=60, n=8, hand='right')
+        forced = ThumbPlacementPlanner().plan(notes, hand='right', existing_forced={})
+        # At least one thumb (finger=1) should be injected
+        assert 1 in forced.values(), f"No thumb injected. forced={forced}"
+
+    def test_planner_respects_existing_constraints(self):
+        """Planner must NOT override PatternLibrary or ChordHeuristic constraints."""
+        from fingering.phrasing.thumb_placement_planner import ThumbPlacementPlanner
+        notes = self._stepwise_run(start_pitch=60, n=8, hand='right')
+        # Pre-constrain index 3 → finger 3 (simulating PatternLibrary)
+        existing = {3: 3}
+        forced = ThumbPlacementPlanner().plan(notes, hand='right', existing_forced=existing)
+        # Index 3 must still be finger 3, not overwritten to 1
+        assert forced.get(3) == 3, f"Planner wrongly overrode existing constraint. forced={forced}"
+
+    def test_planner_skips_black_key_for_thumb(self):
+        """Thumb should not be forced onto a black key note."""
+        from fingering.phrasing.thumb_placement_planner import ThumbPlacementPlanner
+        # Build a run where every note is a black key
+        black_pitches = [61, 63, 66, 68, 70, 73]  # all sharps/flats
+        notes = [make_note(p, i * 0.5, hand='right') for i, p in enumerate(black_pitches)]
+        forced = ThumbPlacementPlanner().plan(notes, hand='right', existing_forced={})
+        # No thumb should be forced on any black key in the forced dict
+        for idx, finger in forced.items():
+            if finger == 1:
+                assert not notes[idx].is_black, f"Thumb forced on black key at index {idx}"
+
+    def test_planner_no_output_for_short_run(self):
+        """Runs shorter than the minimum threshold should yield no constraints."""
+        from fingering.phrasing.thumb_placement_planner import ThumbPlacementPlanner
+        # Only 3 notes — below _MIN_RUN_LENGTH=4
+        notes = self._stepwise_run(n=3, hand='right')
+        forced = ThumbPlacementPlanner().plan(notes, hand='right', existing_forced={})
+        assert len(forced) == 0, f"Expected no constraints for short run, got {forced}"
+
+
+# ─────────────────────────────────────────────
+# Phase 3A — Alberti Bass & Waltz Bass
+# ─────────────────────────────────────────────
+
+class TestAlbertiBassPattern:
+    """Tests for Alberti bass and waltz bass detection in PatternLibrary."""
+
+    def _alberti_notes(self, root_pitch=48, units=2, hand='left') -> list[NoteEvent]:
+        """
+        Build an Alberti bass sequence: root-5th-3rd-5th repeating.
+        root=48 = C3, 5th=55=G3, 3rd=52=E3 (major).
+        Intervals: +7, -4, +4 per unit.
+        """
+        unit = [root_pitch, root_pitch + 7, root_pitch + 4, root_pitch + 7]
+        pitches = unit * units
+        return [
+            make_note(p, i * 0.25, duration=0.25, hand=hand,
+                      measure=1 + i // 8, beat=(i % 8) * 0.25 + 1.0)
+            for i, p in enumerate(pitches)
+        ]
+
+    def test_alberti_detected_lh(self):
+        """LH Alberti bass should be detected and get [5,2,3,2] fingering."""
+        from fingering.phrasing.pattern_library import PatternLibrary
+        notes = self._alberti_notes(units=1)
+        lib = PatternLibrary()
+        matches = lib.find_all(notes, hand='left')
+        alberti_matches = [m for m in matches if m.pattern == 'alberti_bass']
+        assert len(alberti_matches) >= 1, "Alberti bass should be detected"
+        assert alberti_matches[0].fingers == [5, 2, 3, 2], (
+            f"Expected [5,2,3,2], got {alberti_matches[0].fingers}"
+        )
+
+    def test_alberti_not_detected_rh(self):
+        """Alberti bass is a LH pattern — should NOT be detected for RH."""
+        from fingering.phrasing.pattern_library import PatternLibrary
+        notes = self._alberti_notes(units=1, hand='right')
+        lib = PatternLibrary()
+        matches = lib.find_all(notes, hand='right')
+        alberti_matches = [m for m in matches if m.pattern == 'alberti_bass']
+        assert len(alberti_matches) == 0, "Alberti bass should not fire for RH"
+
+    def test_alberti_extends_across_multiple_units(self):
+        """Multiple consecutive Alberti units should be detected as one long match."""
+        from fingering.phrasing.pattern_library import PatternLibrary
+        notes = self._alberti_notes(units=3)  # 12 notes
+        lib = PatternLibrary()
+        matches = lib.find_all(notes, hand='left')
+        alberti_matches = [m for m in matches if m.pattern == 'alberti_bass']
+        assert len(alberti_matches) >= 1
+        # Should cover at least 8 notes (2 units minimum)
+        total_covered = sum(m.end_idx - m.start_idx for m in alberti_matches)
+        assert total_covered >= 8, f"Expected ≥8 notes covered, got {total_covered}"
+
+    def test_waltz_bass_detected_lh(self):
+        """LH waltz bass (root-chord-chord) should be detected.
+        
+        Use a spread voicing NOT caught by _try_arpeggio (which matches only (4,3) and (3,5) triads).
+        C3(48)-F3(53)-A3(57): int1=+5 (P4), int2=+4 (M3) — not a standard arpeggio.
+        """
+        from fingering.phrasing.pattern_library import PatternLibrary
+        pitches = [48, 53, 57, 48, 53, 57]  # two waltz units on F-major-ish voicing
+        notes = [
+            make_note(p, i * 0.33, duration=0.33, hand='left',
+                      measure=1 + i // 3, beat=(i % 3) * 0.33 + 1.0)
+            for i, p in enumerate(pitches)
+        ]
+        lib = PatternLibrary()
+        matches = lib.find_all(notes, hand='left')
+        waltz_matches = [m for m in matches if m.pattern == 'waltz_bass']
+        assert len(waltz_matches) >= 1, (
+            f"Waltz bass should be detected. Got: {[(m.pattern, m.fingers) for m in matches]}"
+        )
+        assert waltz_matches[0].fingers[0] == 5, "Root note should get finger 5"
