@@ -98,13 +98,21 @@ def build_score_profile(
     else:
         texture = ScoreProfile.TEXTURE_MELODY_BASS
 
-    # Tonic estimation: most common pitch class in RH melody
-    if rh:
-        pc_counts: dict[int, int] = {}
-        for n in rh:
-            pc = n.pitch % 12
-            pc_counts[pc] = pc_counts.get(pc, 0) + 1
-        tonic_pc = max(pc_counts, key=pc_counts.get)
+    # Tonic estimation: use the most common pitch class among LH bass notes
+    # (= lowest note per measure in LH). Bass line is the most reliable tonic indicator.
+    # Fallback to RH if no LH available.
+    tonic_source = lh if lh else rh
+    if tonic_source:
+        # Collect lowest note per measure from the tonic source
+        by_measure: dict[int, list] = {}
+        for n in tonic_source:
+            by_measure.setdefault(n.measure, []).append(n)
+        bass_pcs: dict[int, int] = {}
+        for m_notes in by_measure.values():
+            bass_note = min(m_notes, key=lambda n: n.pitch)
+            pc = bass_note.pitch % 12
+            bass_pcs[pc] = bass_pcs.get(pc, 0) + 1
+        tonic_pc = max(bass_pcs, key=bass_pcs.get)
     else:
         tonic_pc = 0
 

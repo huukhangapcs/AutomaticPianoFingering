@@ -133,8 +133,9 @@ def build_harmonic_skeleton(
     for n in lh:
         lh_by_m.setdefault(n.measure, []).append(n)
 
-    # Build per-measure harmony
+    # Build per-measure harmony, carry-forward on rest measures
     harmonies: List[MeasureHarmony] = []
+    last_harmony: Optional[MeasureHarmony] = None  # for carry-forward
     for m in range(1, total_measures + 1):
         rh_notes = rh_by_m.get(m, [])
         lh_notes = lh_by_m.get(m, [])
@@ -142,6 +143,16 @@ def build_harmonic_skeleton(
         # Bass = lowest pitch in LH (or RH if no LH)
         bass_source = lh_notes or rh_notes
         if not bass_source:
+            # Rest measure: carry forward the last known harmony
+            # This fills gaps like m96-m110 (resting pedal point)
+            if last_harmony is not None:
+                harmonies.append(MeasureHarmony(
+                    measure=m,
+                    bass_pc=last_harmony.bass_pc,
+                    rh_pitch_classes=set(),
+                    root_pc=last_harmony.root_pc,
+                    chord_type=last_harmony.chord_type,
+                ))
             continue
         bass_note = min(bass_source, key=lambda n: n.pitch)
         bass_pc = bass_note.pitch % 12
@@ -149,18 +160,17 @@ def build_harmonic_skeleton(
         # RH pitch classes
         rh_pcs = {n.pitch % 12 for n in rh_notes}
 
-        # Root estimation: bass note is primary; check if it forms a chord
-        # with RH content. If not, use most common RH pitch class.
         root_pc = bass_pc
         chord_type = _match_chord_type(rh_pcs | {bass_pc}, root_pc)
 
-        harmonies.append(MeasureHarmony(
+        last_harmony = MeasureHarmony(
             measure=m,
             bass_pc=bass_pc,
             rh_pitch_classes=rh_pcs,
             root_pc=root_pc,
             chord_type=chord_type,
-        ))
+        )
+        harmonies.append(last_harmony)
 
     # Detect cadences from consecutive chord root changes
     cadences: List[Cadence] = []

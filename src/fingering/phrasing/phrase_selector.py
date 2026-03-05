@@ -25,7 +25,7 @@ from fingering.phrasing.score_profile import ScoreProfile
 @dataclass
 class PhraseSelectorConfig:
     """Tunable parameters for phrase selection."""
-    max_phrase_measures: int = 16   # Hard cap — never create phrase > this
+    max_phrase_measures: int = 12   # Hard cap — pianist rarely exceeds 12m phrases
     min_phrase_measures: int = 4    # Pianist never creates < 4m phrases
     cadence_alignment_tolerance: int = 1   # measures of tolerance for cadence match
     confirm_threshold: float = 0.45        # Min bottom-up score to confirm without cadence
@@ -170,19 +170,33 @@ class PhraseSelector:
                     last_boundary = idx
 
         # --- Step 6: Force-split any remaining over-long phrases ---
+        # Insert equidistant splits until ALL segments are <= max_phrase_measures.
+        # Example: 24m phrase + cap=12 → splits at m8 and m16 → three 8m phrases.
         final: List[int] = []
         prev_split = 0
         for boundary in filtered + [len(notes) - 1]:
             phrase_slice = notes[prev_split: boundary + 1]
             if not phrase_slice:
+                prev_split = boundary + 1
                 continue
-            n_measures = phrase_slice[-1].measure - phrase_slice[0].measure + 1
+
+            start_m = phrase_slice[0].measure
+            end_m = phrase_slice[-1].measure
+            n_measures = end_m - start_m + 1
+
             if n_measures > cfg.max_phrase_measures:
-                # Find best split point in middle (prefer cadence)
-                mid_m = phrase_slice[0].measure + cfg.max_phrase_measures // 2
-                best_split = _find_split_near(notes, prev_split, boundary, mid_m, harmonic)
-                if best_split is not None and best_split not in final:
-                    final.append(best_split)
+                # Insert splits every max_phrase_measures measures
+                n_splits = n_measures // cfg.max_phrase_measures
+                for k in range(1, n_splits + 1):
+                    target_m = start_m + k * cfg.max_phrase_measures
+                    if target_m >= end_m:
+                        break
+                    best_split = _find_split_near(
+                        notes, prev_split, boundary, target_m, harmonic,
+                        search_window=3,
+                    )
+                    if best_split is not None and best_split not in final:
+                        final.append(best_split)
 
             if boundary < len(notes) - 1:
                 final.append(boundary)
