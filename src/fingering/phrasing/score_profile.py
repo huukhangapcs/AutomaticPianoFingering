@@ -52,6 +52,7 @@ class ScoreProfile:
 def build_score_profile(
     rh: List[NoteEvent],
     lh: List[NoteEvent],
+    tonic_pc_override: Optional[int] = None,  # Fix 1: from MusicXML key sig
 ) -> ScoreProfile:
     """
     Analyse the full note streams and return a ScoreProfile.
@@ -98,23 +99,24 @@ def build_score_profile(
     else:
         texture = ScoreProfile.TEXTURE_MELODY_BASS
 
-    # Tonic estimation: use the most common pitch class among LH bass notes
-    # (= lowest note per measure in LH). Bass line is the most reliable tonic indicator.
-    # Fallback to RH if no LH available.
-    tonic_source = lh if lh else rh
-    if tonic_source:
-        # Collect lowest note per measure from the tonic source
-        by_measure: dict[int, list] = {}
-        for n in tonic_source:
-            by_measure.setdefault(n.measure, []).append(n)
-        bass_pcs: dict[int, int] = {}
-        for m_notes in by_measure.values():
-            bass_note = min(m_notes, key=lambda n: n.pitch)
-            pc = bass_note.pitch % 12
-            bass_pcs[pc] = bass_pcs.get(pc, 0) + 1
-        tonic_pc = max(bass_pcs, key=bass_pcs.get)
+    # Fix 1: Use MusicXML key signature if provided — much more reliable
+    if tonic_pc_override is not None:
+        tonic_pc = tonic_pc_override
     else:
-        tonic_pc = 0
+        # Fallback: use LH bass notes
+        tonic_source = lh if lh else rh
+        if tonic_source:
+            by_measure: dict[int, list] = {}
+            for n in tonic_source:
+                by_measure.setdefault(n.measure, []).append(n)
+            bass_pcs: dict[int, int] = {}
+            for m_notes in by_measure.values():
+                bass_note = min(m_notes, key=lambda n: n.pitch)
+                pc = bass_note.pitch % 12
+                bass_pcs[pc] = bass_pcs.get(pc, 0) + 1
+            tonic_pc = max(bass_pcs, key=bass_pcs.get)
+        else:
+            tonic_pc = 0
 
     return ScoreProfile(
         rh_pitch_range=rh_range,

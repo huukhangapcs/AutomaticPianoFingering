@@ -158,10 +158,10 @@ class MotifEngine:
 
     def __init__(
         self,
-        motif_lengths: tuple = (4, 5, 6, 8),   # note counts to try
-        min_recurrences: int = 2,               # need >= 2 occurrences to be a motif
-        similarity_threshold: float = 0.80,    # minimum similarity to group
-        min_measures_apart: int = 4,            # ignore self-overlapping matches
+        motif_lengths: tuple = (8, 12, 16),   # Fix 2: phrase-level (not sub-motif)
+        min_recurrences: int = 2,              # need >= 2 occurrences to be a motif
+        similarity_threshold: float = 0.80,   # minimum similarity to group
+        min_measures_apart: int = 8,           # Fix 2: phrase-level gap (was 4)
     ):
         self.motif_lengths = motif_lengths
         self.min_recurrences = min_recurrences

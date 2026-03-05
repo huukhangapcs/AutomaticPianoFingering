@@ -41,26 +41,36 @@ class MusicXMLReader:
     def parse_grand_staff(self, path: str) -> Tuple[List[NoteEvent], List[NoteEvent]]:
         """
         Parse a grand staff (2-staff piano score) into separate RH and LH lists.
-
         Returns: (right_hand_notes, left_hand_notes)
-        Both lists are sorted by onset time.
         """
-        all_notes = self._parse_all(path)
+        all_notes, _ = self._parse_all(path)
         rh = [n for n in all_notes if n.hand == 'right']
         lh = [n for n in all_notes if n.hand == 'left']
         return rh, lh
 
+    def parse_grand_staff_with_key(self, path: str) -> Tuple[List[NoteEvent], List[NoteEvent], int, str]:
+        """
+        Like parse_grand_staff but also returns (tonic_pc, mode).
+        tonic_pc: 0=C, 1=C#, ..., 11=B
+        mode: 'major' | 'minor'
+        """
+        all_notes, key_info = self._parse_all(path)
+        tonic_pc, mode = key_info
+        rh = [n for n in all_notes if n.hand == 'right']
+        lh = [n for n in all_notes if n.hand == 'left']
+        return rh, lh, tonic_pc, mode
+
     def parse(self, path: str, hand: str = 'right') -> List[NoteEvent]:
         """
         Parse a single-staff file, tagging all notes with the given hand.
-        For grand staff files use parse_grand_staff() instead.
         """
-        notes = self._parse_all(path)
+        notes, _ = self._parse_all(path)
         for n in notes:
-            n.hand = hand  # Force override for single-staff use
+            n.hand = hand
         return notes
 
-    def _parse_all(self, path: str) -> List[NoteEvent]:
+    def _parse_all(self, path: str) -> Tuple[List[NoteEvent], Tuple[int, str]]:
+        """Returns (notes, (tonic_pc, mode)). Mode is 'major' or 'minor'."""
         tree = ET.parse(path)
         root = tree.getroot()
 
@@ -77,11 +87,11 @@ class MusicXMLReader:
         current_measure = 0
         current_dynamic = 'mf'
         open_slurs: dict[str, bool] = {}
-        # Per-staff time tracking — persists across ALL measures
-        # staff_time[staff_num]        = current beat position
-        # measure_beat_start[staff_num] = beat position at start of current measure
         staff_time: dict[str, float]        = {}
         measure_beat_start: dict[str, float] = {}
+        # Key signature (Fix 1)
+        tonic_pc: int = 0
+        mode: str = 'major'
 
         for measure_el in root.iter(tag('measure')):
             current_measure += 1
@@ -92,11 +102,21 @@ class MusicXMLReader:
             for child in measure_el:
                 local = child.tag.replace(ns, '')
 
-                # --- Attributes: divisions, time sig ---
+                # --- Attributes: divisions, key sig, time sig ---
                 if local == 'attributes':
                     div_el = child.find(tag('divisions'))
                     if div_el is not None:
                         divisions = int(div_el.text)
+                    # Fix 1: Parse key signature
+                    key_el = child.find(tag('key'))
+                    if key_el is not None:
+                        fifths_el = key_el.find(tag('fifths'))
+                        mode_el   = key_el.find(tag('mode'))
+                        if fifths_el is not None:
+                            fifths = int(fifths_el.text or '0')
+                            mode_str = (mode_el.text if mode_el is not None else 'major').lower()
+                            mode = mode_str
+                            tonic_pc = _fifths_mode_to_tonic(fifths, mode_str)
 
                 # --- Dynamic direction words ---
                 if local == 'direction':
@@ -218,4 +238,40 @@ class MusicXMLReader:
 
         # Sort by onset then by hand (right before left) for consistent order
         notes.sort(key=lambda n: (n.onset, 0 if n.hand == 'right' else 1))
-        return notes
+        return notes, (tonic_pc, mode)
+
+
+# ──────────────────────────────────────────────────────────────
+# Fix 1: Circle-of-fifths → tonic pitch class converter
+# ──────────────────────────────────────────────────────────────
+
+# Major keys (sharps 0..6: C G D A E B F#; flats 1..6: F Bb Eb Ab Db Gb)
+_MAJOR_TONIC = {
+    0: 0,   # C major
+    1: 7,   # G major
+    2: 2,   # D major
+    3: 9,   # A major
+    4: 4,   # E major
+    5: 11,  # B major
+    6: 6,   # F# major
+    -1: 5,  # F major
+    -2: 10, # Bb major
+    -3: 3,  # Eb major
+    -4: 8,  # Ab major
+    -5: 1,  # Db major
+    -6: 6,  # Gb major
+}
+
+# Relative minor is 9 semitones higher than (= 3 semitones lower than) the major
+def _fifths_mode_to_tonic(fifths: int, mode: str) -> int:
+    """
+    Convert MusicXML <fifths> + <mode> to tonic pitch class.
+    e.g. fifths=0, mode='minor' → A minor → tonic_pc=9
+         fifths=0, mode='major' → C major → tonic_pc=0
+         fifths=-3, mode='major'→ Eb major → tonic_pc=3
+    """
+    major_tonic = _MAJOR_TONIC.get(fifths, 0)
+    if mode == 'minor':
+        # Relative minor tonic is major_tonic - 3 semitones (mod 12)
+        return (major_tonic - 3) % 12
+    return major_tonic

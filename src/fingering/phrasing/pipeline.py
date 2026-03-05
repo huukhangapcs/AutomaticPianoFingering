@@ -28,6 +28,7 @@ from fingering.phrasing.score_profile import ScoreProfile, build_score_profile
 from fingering.phrasing.motif_engine import MotifEngine, Section
 from fingering.phrasing.harmonic_skeleton import HarmonicSkeleton, build_harmonic_skeleton
 from fingering.phrasing.phrase_selector import PhraseSelector, PhraseSelectorConfig
+from fingering.phrasing.period_detector import PeriodDetector
 
 
 class PhraseAwareFingering:
@@ -53,25 +54,28 @@ class PhraseAwareFingering:
         boundary_threshold: float = 0.40,
         time_sig_numerator: int = 4,
         min_phrase_notes: int = 3,
-        max_phrase_measures: int = 16,
+        max_phrase_measures: int = 12,   # Fix 5: synced with PhraseSelector cap
         use_motif_engine: bool = True,
+        tonic_pc: Optional[int] = None,  # Fix 1: from MusicXML key sig
     ):
         self.boundary_threshold = boundary_threshold
         self.use_motif_engine = use_motif_engine
+        self.tonic_pc = tonic_pc  # Fix 1
 
         self.detector  = PhraseBoundaryDetector(
             boundary_threshold=boundary_threshold,
             time_sig_numerator=time_sig_numerator,
             min_phrase_notes=min_phrase_notes,
-            max_phrase_measures=max_phrase_measures,
+            max_phrase_measures=max_phrase_measures,    # Fix 5
         )
         self.analyzer  = PhraseIntentAnalyzer()
         self.dp_solver = PhraseScopedDP()
         self.stitcher  = CrossPhraseStitch()
         self.motif_engine = MotifEngine()
         self.phrase_selector = PhraseSelector(
-            PhraseSelectorConfig(max_phrase_measures=max_phrase_measures)
+            PhraseSelectorConfig(max_phrase_measures=max_phrase_measures)  # Fix 5
         )
+        self.period_detector = PeriodDetector()  # Fix 4
 
     # ──────────────────────────────────────────────────────────────
     # Public API
@@ -140,10 +144,10 @@ class PhraseAwareFingering:
         rh = notes
         lh = companion or []
 
-        # Layer 0: build global score profile
-        score_profile = build_score_profile(rh, lh)
+        # Layer 0: build global score profile (Fix 1: with key sig tonic if available)
+        score_profile = build_score_profile(rh, lh, tonic_pc_override=self.tonic_pc)
 
-        # Layer 1: motif-based form detection
+        # Layer 1: motif-based form detection (Fix 2: phrase-level motif lengths)
         sections: List[Section] = []
         if self.use_motif_engine and len(notes) >= 8:
             sections = self.motif_engine.infer_sections(notes)
@@ -157,7 +161,6 @@ class PhraseAwareFingering:
 
         # Layer 3: PhraseSelector merge
         if sections:
-            # Top-down driven: use PhraseSelector to merge
             boundary_indices = self.phrase_selector.select(
                 notes=notes,
                 bottom_up_signals=bottom_up_signals,
@@ -169,8 +172,16 @@ class PhraseAwareFingering:
                 notes, boundary_indices
             )
         else:
-            # No sections detected: fall back to pure bottom-up
             phrases = self.detector.detect(notes)
+
+        # Fix 4: Run PeriodDetector — annotate phrases with antecedent/consequent labels
+        if score_profile.tonic_pc is not None:
+            self.period_detector.tonic_pc = score_profile.tonic_pc
+        periods, _ = self.period_detector.detect(phrases, harmonic)
+        # Annotate phrases with period membership
+        for period in periods:
+            period.antecedent.period_role = 'antecedent'
+            period.consequent.period_role = 'consequent'
 
         return phrases
 
