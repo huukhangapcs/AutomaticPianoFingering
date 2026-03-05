@@ -81,6 +81,8 @@ MusicXML File
 │    • Intent modifiers (LEGATO subst / BRILLIANT amplify)   │
 │    • Climax note → strong fingers (2, 3)                    │
 │    • Chord heuristic: RH [1,3,5], LH [5,3,1]              │
+│    • Finger-4 avoidance: soft penalty ngón 4 [Nguyên tắc 5]│
+│    • Black key long finger: reward ngón 2/3/4 [Nguyên tắc11│
 │                                                             │
 │  Layer D: CrossPhraseStitch                                 │
 │    • Junction constraint, preferred end finger look-ahead  │
@@ -158,7 +160,8 @@ Benchmark trên 20 file đầu tiên của **PIG Piano Fingering Dataset v1.2** 
 | + Voice Separation | 30.53% | 30.75% |
 | + Tone-specific Scale + Hanon | 31.91% | 32.16% |
 | + Thumb-Under/Finger-Over rewards | 31.91% | 32.16% |
-| **+ Biomechanics (tendon + tempo)** | **32.11%** | **32.44%** |
+| + Biomechanics (tendon + tempo) | 32.11% | 32.44% |
+| **+ Finger-4 penalty + Black key long finger** | **35.47%** | **35.66%** |
 
 > **Note:** GT annotations reflect personal stylistic preferences. The same piece fingered by different professional pianists differs 30–40%, so ~32% match against a single annotator's style is realistic for a rule-based system.
 
@@ -233,11 +236,11 @@ python scripts/error_analysis.py 20
 | `boundary_detector.py` | Logit/Sigmoid probability + Viterbi global DP |
 | `scale_fingering.py` | 12-tone scale fingering database (all major + minor) |
 | `pattern_library.py` | Tone-specific scale, Hanon 5-finger patterns |
-| `phrase_dp.py` | Thumb-Under/Finger-Over rewards, biomechanics |
+| `phrase_dp.py` | Thumb-Under/Finger-Over rewards, biomechanics, finger-4 avoidance, black key long finger |
 | `keyboard.py` | Tendon coupling, black key depth, tempo-aware span |
 | `fingering_auditor.py` | 9-rule post-DP auditor + auto-repair |
 | `error_analysis.py` | Error categorizer (9 types + confusion matrix) |
-| Tests | 35 unit tests pass |
+| Tests | 43 unit tests pass |
 
 ### 🚧 Phase 3 — Tiếp theo (Neural)
 
@@ -269,6 +272,8 @@ Rule-based engine đã đạt **trần hiệu suất ~32%**. Bước tiếp theo
 | Luồn ngón (thumb-under) | Ngón cái chui qua | ✅ Reward model |
 | Vắt ngón (finger-over) | Ngón 3 vắt qua ngón cái | ✅ Reward model |
 | Sinh học ngón tay | Gân 3-4 liên kết, tempo | ✅ Biomechanical costs |
+| Tránh ngón 4 | Ring finger yếu, ít độc lập | ✅ FINGER4_SOLO_PENALTY |
+| Ngón dài cho phím đen | Phím đen sâu hơn 10mm | ✅ BLACK_KEY_LONG_FINGER_REWARD |
 | Chord fingering | C-E-G LH → 5-3-1 | ✅ ChordHeuristic |
 | Cross-phrase planning | Ngón cuối A → đầu B | ✅ CrossPhraseStitch |
 | Kiểm tra lỗi | "Ngón này không thể" | ✅ FingeredAuditor |
