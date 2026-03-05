@@ -55,6 +55,8 @@ class PhraseBoundarySignal:
     melodic_resolution: float = 0.0  # Stepwise descent into long note (0–1)
     harmonic_cadence: float = 0.0    # Bass movement suggesting V→I or similar (0–1)
     melodic_leap_compensation: float = 0.0 # Leap >= P4 followed by stepwise resolution (0-1)
+    # === Fix 5: Phrase-final lengthening (review.txt Signal 2) ===
+    phrase_final_lengthening: float = 0.0  # Duration increases into this note (0–1)
 
     def boundary_score(self) -> float:
         """
@@ -99,6 +101,7 @@ class PhraseBoundarySignal:
         logit += 0.8 * float(self.next_note_is_downbeat) # Phrase lands on beat 1
         logit += 0.8 * float(self.large_interval)        # Leap = topic change
         logit += 0.3 * float(self.dynamic_change)        # Dynamic shift
+        logit += 1.5 * self.phrase_final_lengthening     # Duration ramp-up before boundary
         
         # We purposely exclude `phrase_length_prior` from the low-level P(boundary) 
         # so that the Viterbi/DP solver can apply the prior as an edge transition cost!

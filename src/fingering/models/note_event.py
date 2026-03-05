@@ -53,6 +53,10 @@ class NoteEvent:
     has_tenuto: bool = False
     dynamic: str = "mf"             # 'pp','p','mp','mf','f','ff'
 
+    # --- Tie (distinct from slur: same pitch held across barline) ---
+    is_tied_start: bool = False     # <tie type="start">: note starts a tie
+    is_tied_stop: bool = False      # <tie type="stop">: note is held from previous
+
     # --- Keyboard geometry (auto-computed) ---
     is_black: bool = field(init=False)
     white_key_index: int = field(init=False)

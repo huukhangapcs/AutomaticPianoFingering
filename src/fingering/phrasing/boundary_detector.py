@@ -283,6 +283,44 @@ def _detect_cadence_strength(
 
 
 # ================================================================
+# Fix 5: Phrase-Final Lengthening (from review.txt)
+# Notes tend to get progressively longer just before a phrase ends
+# (classic "ritardando" or just notational elongation).
+# ================================================================
+
+def _phrase_final_lengthening(
+    notes: List[NoteEvent],
+    idx: int,
+    window: int = 3,
+) -> float:
+    """
+    Detect rhythmic lengthening approaching `idx`.
+
+    If the last `window` notes before `idx` show monotonically increasing
+    (or significantly growing) duration, it suggests phrase closure.
+
+    Returns 0.0 → 1.0.
+    """
+    if idx < window:
+        return 0.0
+
+    segment = notes[idx - window: idx + 1]  # window notes + current
+    durations = [n.duration for n in segment]
+
+    # Count how many consecutive pairs are increasing
+    increases = sum(1 for a, b in zip(durations, durations[1:]) if b > a * 1.1)
+
+    if increases == window:          # All pairs increasing
+        return 1.0
+    elif increases >= window - 1:    # All but one
+        return 0.7
+    elif increases >= window - 2 and durations[-1] >= durations[0] * 1.5:
+        # Not monotone but clear overall growth
+        return 0.4
+    return 0.0
+
+
+# ================================================================
 # Main Boundary Detector
 # ================================================================
 
@@ -417,6 +455,9 @@ class PhraseBoundaryDetector:
             sig.melodic_resolution = _melodic_resolution_strength(
                 notes, i, sig.agogic_accent
             )
+
+            # --- Fix 5: Phrase-final lengthening ---
+            sig.phrase_final_lengthening = _phrase_final_lengthening(notes, i)
 
             # --- Fix 3: Harmonic cadence via bass movement ---
             sig.harmonic_cadence = _harmonic_cadence_strength(notes, i)

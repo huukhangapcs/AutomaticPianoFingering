@@ -182,6 +182,15 @@ class MusicXMLReader:
                     is_staccato = has_accent = has_tenuto = False
                     gt_finger: Optional[int] = None
 
+                    # --- Tie: distinct from slur — same pitch held across barline ---
+                    is_tied_start = is_tied_stop = False
+                    for tie_el in child.iter(tag('tie')):
+                        tie_type = tie_el.get('type', '')
+                        if tie_type == 'start':
+                            is_tied_start = True
+                        elif tie_type == 'stop':
+                            is_tied_stop = True
+
                     notations_el = child.find(tag('notations'))
                     if notations_el is not None:
                         # Slurs
@@ -228,6 +237,8 @@ class MusicXMLReader:
                         has_accent=has_accent,
                         has_tenuto=has_tenuto,
                         dynamic=current_dynamic,
+                        is_tied_start=is_tied_start,
+                        is_tied_stop=is_tied_stop,
                         finger=gt_finger,   # ground truth stored here
                     )
                     notes.append(note)

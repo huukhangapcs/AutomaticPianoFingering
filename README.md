@@ -26,6 +26,7 @@ MusicXML File
 │  • Grand staff support (staff 1=RH, staff 2=LH)            │
 │  • Per-staff time tracking với <backup> elements            │
 │  • Slur, staccato, accent, fingering GT parsing             │
+│  • Tie parsing: is_tied_start / is_tied_stop               │
 │  • Key signature → tonic_pc (12 keys)                       │
 └───────────────────┬─────────────────────────────────────────┘
                     │ List[NoteEvent]
@@ -40,7 +41,8 @@ MusicXML File
 │    • Tránh nhiễu hợp âm đệm khi phân tích phrase           │
 │                                                             │
 │  Layer 2: PhraseBoundaryDetector [v2 — Logit/Sigmoid]       │
-│    • 8 signals: slur, rest, cadence, agogic, melodic arc   │
+│    • 9 signals: slur, rest, cadence, agogic, melodic arc   │
+│    • Phrase-final lengthening (duration ramp toward end)   │
 │    • Melodic Leap Compensation (≥ P4 + stepwise resolve)    │
 │    • Boundary probability P ∈ (0,1) — không còn threshold  │
 │                                                             │
@@ -86,6 +88,7 @@ MusicXML File
 │                                                             │
 │  Layer D: CrossPhraseStitch                                 │
 │    • Junction constraint, preferred end finger look-ahead  │
+│    • Lookahead 3-note: chọn first finger tối ưu cho phrase sau│
 │                                                             │
 │  Layer E: FingeredAuditor [NEW]                             │
 │    • 9 rules (HARD_VIOLATION + WARNING)                     │
@@ -161,7 +164,8 @@ Benchmark trên 20 file đầu tiên của **PIG Piano Fingering Dataset v1.2** 
 | + Tone-specific Scale + Hanon | 31.91% | 32.16% |
 | + Thumb-Under/Finger-Over rewards | 31.91% | 32.16% |
 | + Biomechanics (tendon + tempo) | 32.11% | 32.44% |
-| **+ Finger-4 penalty + Black key long finger** | **35.47%** | **35.66%** |
+| + Finger-4 penalty + Black key long finger | 35.47% | 35.66% |
+| **+ Lookahead stitch + Phrase-final lengthening** | **35.54%** | **35.73%** |
 
 > **Note:** GT annotations reflect personal stylistic preferences. The same piece fingered by different professional pianists differs 30–40%, so ~32% match against a single annotator's style is realistic for a rule-based system.
 

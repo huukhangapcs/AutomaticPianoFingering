@@ -64,7 +64,7 @@ REGISTER_MISMATCH_COST = 0.5  # Thumb on mid-high note in non-forced context
 # ngón 3 và 5. Pianist thực tế tránh dùng ngón 4 ở nốt đơn lẻ khi có lựa
 # chọn tốt hơn (1-2-3 hoặc 5). Penalty nhẹ để không override các trường hợp
 # thực sự cần ngón 4 (scale Bb, chord rải, v.v.).
-FINGER4_SOLO_PENALTY   = 0.8  # Soft penalty: ngón 4 ở vị trí không cần thiết
+FINGER4_SOLO_PENALTY   = 0.4  # Soft penalty: ngón 4 ở vị trí không cần thiết (tuned from 0.8)
 
 # ── Nguyên tắc 11: Ngón dài cho phím đen ─────────────────────────────────
 # Phím đen nằm sâu hơn ~10mm so với phím trắng. Pianist tự nhiên dùng ngón

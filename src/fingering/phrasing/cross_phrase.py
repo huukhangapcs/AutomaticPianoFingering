@@ -82,8 +82,15 @@ class CrossPhraseStitch:
         if is_crash:
             allowed = sorted(costs, key=costs.get)[:3]
 
-        # Preferred = minimum cost
-        preferred = min(allowed, key=lambda f: costs[f]) if allowed else None
+        # Preferred = minimum of (junction_cost + lookahead_cost)
+        # Lookahead: evaluate how well each first_finger sets up the
+        # NEXT 3 notes of phrase_b (not just the first note).
+        lookahead_costs: dict[int, float] = {}
+        for f_start in allowed:
+            la = self._lookahead_cost(phrase_b, f_start, n_notes=3)
+            lookahead_costs[f_start] = costs[f_start] + la
+
+        preferred = min(allowed, key=lambda f: lookahead_costs[f]) if allowed else None
 
         return {
             'allowed_first_fingers': allowed,
@@ -137,6 +144,51 @@ class CrossPhraseStitch:
             return {2, 3}  # Middle fingers are versatile
 
     # ------------------------------------------------------------------
+
+    def _lookahead_cost(self, phrase_b: Phrase, first_finger: int, n_notes: int = 3) -> float:
+        """
+        Estimate the ergonomic cost of starting phrase_b with `first_finger`
+        by simulating a simple greedy run over the first `n_notes` notes.
+
+        Pianist insight: the first finger of a phrase determines hand position
+        for the next few notes. A bad start compounds across the phrase.
+
+        Returns: cumulative ergonomic cost (lower = better setup).
+        """
+        notes = phrase_b.notes
+        if not notes or n_notes < 2:
+            return 0.0
+
+        look = notes[:min(n_notes, len(notes))]
+        cost = 0.0
+        f_prev = first_finger
+        _, max_span_init = finger_span_limits(first_finger, first_finger)
+
+        # Black key penalty on the very first note
+        if look[0].is_black and first_finger == 1:
+            cost += 5.0
+
+        for k in range(1, len(look)):
+            span = white_key_span(look[k - 1], look[k])
+            ascending = is_ascending(look[k - 1], look[k])
+
+            # Greedy: pick the best finger for look[k] given f_prev
+            best_f, best_c = f_prev, float('inf')
+            for f_curr in range(1, 6):
+                _, max_sp = finger_span_limits(f_prev, f_curr)
+                over = max(0.0, span - max_sp)  # stretch penalty
+                c = over ** 2 * 2.0
+                # Prefer natural finger direction
+                if ascending and f_curr < f_prev and f_curr != 1:
+                    c += 2.0
+                if not ascending and f_curr > f_prev and f_prev != 1:
+                    c += 2.0
+                if f_curr < best_c or c < best_c:
+                    best_f, best_c = f_curr, c
+            cost += best_c
+            f_prev = best_f
+
+        return cost
 
     def _junction_cost(
         self,
