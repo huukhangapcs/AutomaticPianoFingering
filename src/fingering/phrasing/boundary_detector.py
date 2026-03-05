@@ -337,7 +337,10 @@ class PhraseBoundaryDetector:
             next_note = notes[i + 1] if i + 1 < n else None
             prev_note = notes[i - 1] if i > 0 else None
 
-            sig = PhraseBoundarySignal(position=i)
+            sig = PhraseBoundarySignal(
+                position=i,
+                note_duration=note.duration
+            )
 
             # --- Slur ---
             sig.slur_end = note.slur_end

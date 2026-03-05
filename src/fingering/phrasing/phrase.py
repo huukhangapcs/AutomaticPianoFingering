@@ -50,6 +50,7 @@ class PhraseBoundarySignal:
     phrase_length_prior: float = 0.0    # Bayesian prior from standard phrase lengths
     dynamic_change: bool = False
     # === New signals (Fix 2, Fix 3) ===
+    note_duration: float = 0.0       # Absolute duration of the current note
     agogic_accent: float = 0.0       # Current note is locally longest (0–1 strength)
     melodic_resolution: float = 0.0  # Stepwise descent into long note (0–1)
     harmonic_cadence: float = 0.0    # Bass movement suggesting V→I or similar (0–1)
@@ -75,8 +76,25 @@ class PhraseBoundarySignal:
         """
         score = 0.0
         score += 0.35 * float(self.slur_end)                         # strongest
-        score += 0.22 * min(1.0, float(self.rest_follows))           # rest alone ≠ boundary
-        score += 0.15 * self.agogic_accent                           # long note = breathpoint
+        
+        # Scaling rest score by duration: long rests should force a boundary
+        if self.rest_follows:
+            if self.rest_duration >= 1.0:   # >= Quarter rest
+                score += 0.45               # Forces boundary (threshold is 0.40)
+            elif self.rest_duration >= 0.5: # >= Eighth rest
+                score += 0.30
+            else:                           # Short rest
+                score += 0.22
+                
+        # Scaling agogic accent: very long notes force a boundary
+        if self.agogic_accent > 0:
+            if self.agogic_accent >= 1.0 or self.note_duration >= 3.0:
+                score += 0.45               # Extremely long note -> forces boundary
+            elif self.agogic_accent >= 0.5 or self.note_duration >= 2.0:
+                score += 0.35               # Strong signal, forces boundary if next note is on downbeat
+            else:
+                score += 0.15 * self.agogic_accent
+                
         score += 0.15 * self.cadence_strength                        # metric + interval
         score += 0.18 * self.harmonic_cadence                        # bass V→I (now precise)
         score += 0.10 * self.melodic_resolution                      # stepwise descent

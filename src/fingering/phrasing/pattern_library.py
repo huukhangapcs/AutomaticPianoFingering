@@ -193,41 +193,42 @@ class PatternLibrary:
             return None
 
         ascending = notes[start + 1].pitch > notes[start].pitch
-        full_template = template if ascending else tuple(-s for s in template)
 
-        n_avail = min(len(notes) - start, len(template))  # max notes to consume
+        # Find maximum contiguous stepwise motion in the same direction
+        length = 1
+        for i in range(1, len(notes) - start):
+            interval = notes[start + i].pitch - notes[start + i - 1].pitch
+            if ascending and interval in (1, 2):
+                length += 1
+            elif (not ascending) and interval in (-1, -2):
+                length += 1
+            else:
+                break
 
-        # Try all starting offsets and lengths within the template
-        for offset in range(len(template) - min_len + 1):
-            for length in range(min_len, n_avail + 1):
-                if offset + length - 1 > len(full_template):
-                    continue
-                sub = full_template[offset: offset + length - 1]
-                if len(sub) == 0:
-                    continue
-                got = _intervals(notes, start, length)
-                if len(got) != len(sub):
-                    continue
-                if got == sub:
-                    # Match — slice the correct fingering segment
-                    if hand == 'right':
-                        full_f = _RH_SCALE_FINGERS if ascending else list(reversed(_LH_SCALE_FINGERS))
-                    else:
-                        full_f = _LH_SCALE_FINGERS if not ascending else list(reversed(_RH_SCALE_FINGERS))
+        if length < min_len:
+            return None
 
-                    finger_slice = full_f[offset: offset + length]
-                    if len(finger_slice) < length:
-                        # Extend by wrapping (cross-thumb patterns)
-                        finger_slice = (full_f * 2)[offset: offset + length]
+        # Determine fingering for a generic scalar run
+        # If it's a short run (e.g., 3-5 notes), use consecutive fingers
+        # If it's long, use scale pattern (requires more complex thumb logic, but we default to standard)
+        if hand == 'right':
+            full_f = _RH_SCALE_FINGERS if ascending else list(reversed(_LH_SCALE_FINGERS))
+        else:
+            full_f = _LH_SCALE_FINGERS if not ascending else list(reversed(_RH_SCALE_FINGERS))
 
-                    return PatternMatch(
-                        start_idx=start,
-                        end_idx=start + length,
-                        pattern=f"{name}_{'asc' if ascending else 'desc'}_off{offset}",
-                        fingers=finger_slice[:length],
-                        confidence=0.75,
-                    )
-        return None
+        # We don't know the exact starting offset, so we just supply consecutive fingers
+        # For a generic run, 1-2-3-4-5 is a safe default, letting DP adjust if needed
+        fingers = full_f[:length]
+        if length > len(fingers):
+            fingers = (full_f * 2)[:length]
+
+        return PatternMatch(
+            start_idx=start,
+            end_idx=start + length,
+            pattern=f"scalar_run_{'asc' if ascending else 'desc'}",
+            fingers=fingers,
+            confidence=0.5, # Lower confidence for generic runs
+        )
 
     def _try_arpeggio(
         self,
@@ -259,9 +260,10 @@ class PatternLibrary:
         length = 3
         if start + 6 <= n:
             steps6 = _intervals(notes, start, 6)
-            if ascending and steps6 == root_pos + root_pos:
+            # 6 notes -> 5 intervals. E.g. (4, 3, 5, 4, 3) for root C major C-E-G-C-E-G
+            if ascending and steps6 == (root_pos[0], root_pos[1], 12 - sum(root_pos), root_pos[0], root_pos[1]):
                 length = 6
-            if (not ascending) and steps6 == (-4, -3, -4, -3, -4, -3):
+            if (not ascending) and steps6 == (-4, -3, -5, -4, -3):
                 length = 6
 
         if hand == 'right':
