@@ -209,12 +209,18 @@ class TestPhraseBoundaryDetector:
         assert len(phrases) >= 2
 
     def test_slur_end_creates_boundary(self):
-        notes = ascending_scale(n=8)
-        # Mark note 3 as slur_end
-        notes[3].slur_end = True
-        notes[4].slur_start = True
-        notes[4].beat = 1.0
-        notes[4].measure = 2
+        # Create 16 notes across 4 measures (4 notes per measure)
+        notes = []
+        for i in range(16):
+            m = (i // 4) + 1
+            b = (i % 4) + 1.0
+            n = make_note(60 + i, i * 1.0, duration=1.0, measure=m, beat=b)
+            notes.append(n)
+            
+        # Mark the end of measure 2 as a slur end
+        notes[7].slur_end = True
+        notes[8].slur_start = True
+        
         detector = PhraseBoundaryDetector(boundary_threshold=0.30)
         phrases = detector.detect(notes)
         assert len(phrases) >= 2

@@ -58,54 +58,53 @@ class PhraseBoundarySignal:
 
     def boundary_score(self) -> float:
         """
-        Fuse all signals → single boundary strength [0..1].
+        [Phase 3: Deep Learning Preparatory]
+        Fuse all signals → single boundary probability [0..1] via Sigmoid.
 
-        Weight philosophy:
-          rest_follows    = 0.20  (necessary but not sufficient alone)
-          slur_end        = 0.35  (strongest single signal when present)
-          agogic_accent   = 0.20  (primary signal in absence of slurs)
-          cadence_strength= 0.15  (harmonic + metric cues combined)
-          harmonic_cadence= 0.15  (bass V→I motion)
-          melodic_leap    = 0.12  (leap >= P4 then stepwise resolution)
-          melodic_resol.  = 0.10  (stepwise descent into breathpoint)
-          downbeat        = 0.10  (next note is beat 1 of new measure)
-          phrase_len_prior= 0.10  (classical phrase length norms)
-          large_interval  = 0.03  (leap suggests new topic)
-          dynamic_change  = 0.02  (dynamic shift)
-
-        Note: rest_follows is CAPPED so that rest alone (0.20) < threshold (0.40).
-        Need at least one more supporting signal to confirm a boundary.
+        Instead of hard threshold logic, we treat these raw signals as features
+        and compute a logit value, which is then squashed by a sigmoid.
+        This provides a smooth probability surface for the downstream 
+        DP/Viterbi segmentation engine to optimize globally.
         """
-        score = 0.0
-        score += 0.35 * float(self.slur_end)                         # strongest
+        import math
         
-        # Scaling rest score by duration: long rests should force a boundary
+        # Base bias (negative to suppress noise, boundary is a rare event)
+        logit = -2.5
+        
+        # --- Strong Explicit Signals ---
+        if self.slur_end:
+            logit += 1.8                               # Slur naturally signifies breath
+            
         if self.rest_follows:
-            if self.rest_duration >= 1.0:   # >= Quarter rest
-                score += 0.45               # Forces boundary (threshold is 0.40)
-            elif self.rest_duration >= 0.5: # >= Eighth rest
-                score += 0.30
-            else:                           # Short rest
-                score += 0.22
-                
-        # Scaling agogic accent: very long notes force a boundary
+            if self.rest_duration >= 1.0:
+                logit += 4.0                           # Quarter rest: Almost certainly
+            elif self.rest_duration >= 0.5:
+                logit += 2.0                           # Eighth rest: Likely
+            else:
+                logit += 0.8                           # Short rest: Requires support
+
+        # --- Musical Context Signals ---
         if self.agogic_accent > 0:
             if self.agogic_accent >= 1.0 or self.note_duration >= 3.0:
-                score += 0.45               # Extremely long note -> forces boundary
+                logit += 3.5                           # Extremely long note
             elif self.agogic_accent >= 0.5 or self.note_duration >= 2.0:
-                score += 0.35               # Strong signal, forces boundary if next note is on downbeat
+                logit += 2.0                           
             else:
-                score += 0.15 * self.agogic_accent
-                
-        score += 0.15 * self.cadence_strength                        # metric + interval
-        score += 0.18 * self.harmonic_cadence                        # bass V→I (now precise)
-        score += 0.12 * self.melodic_leap_compensation               # leap >= P4, stepwise resolve
-        score += 0.10 * self.melodic_resolution                      # stepwise descent
-        score += 0.10 * float(self.next_note_is_downbeat)            # phrase lands on 1
-        score += 0.10 * self.phrase_length_prior                     # 4/8 bar norm
-        score += 0.03 * float(self.large_interval)                   # leap = topic change
-        score += 0.02 * float(self.dynamic_change)
-        return min(score, 1.0)
+                logit += 1.0 * self.agogic_accent
+
+        logit += 1.5 * self.cadence_strength           # Metric + Interval cues
+        logit += 2.0 * self.harmonic_cadence           # Bass V→I motion
+        logit += 1.2 * self.melodic_leap_compensation  # Leap >= P4 then stepwise resolve
+        logit += 1.0 * self.melodic_resolution         # Stepwise descent
+        logit += 0.8 * float(self.next_note_is_downbeat) # Phrase lands on beat 1
+        logit += 0.8 * float(self.large_interval)        # Leap = topic change
+        logit += 0.3 * float(self.dynamic_change)        # Dynamic shift
+        
+        # We purposely exclude `phrase_length_prior` from the low-level P(boundary) 
+        # so that the Viterbi/DP solver can apply the prior as an edge transition cost!
+        
+        probability = 1.0 / (1.0 + math.exp(-logit))
+        return probability
 
 
 @dataclass

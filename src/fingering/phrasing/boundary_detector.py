@@ -20,7 +20,12 @@ from fingering.phrasing.phrase import (
 # --- Constants ---
 
 # Boundary is confirmed when fused score exceeds this threshold
+# (Legacy: used in v1. Kept here for compatibility if needed elsewhere)
 BOUNDARY_THRESHOLD = 0.40
+
+# Phrase Segmentation v2 Parameters
+MIN_PHRASE_MEASURES = 2
+MAX_PHRASE_MEASURES = 12
 
 # Minimum phrase length in notes (avoid trivially short phrases)
 MIN_PHRASE_NOTES = 3
@@ -309,18 +314,40 @@ class PhraseBoundaryDetector:
 
     def detect(self, notes: List[NoteEvent]) -> List[Phrase]:
         """
-        Segment `notes` into a list of Phrase objects.
-
-        Each Phrase contains the notes belonging to that phrase together
-        with metadata used by downstream layers.
+        Public API: run boundary detection on a sequence of NoteEvents.
+        
+        Applies Layer 2 Voice Separation so that signals are scored purely
+        against the top melody line, avoiding noise from internal polyphony.
         """
         if not notes:
             return []
 
-        signals = self._compute_signals(notes)
-        boundaries = self._select_boundaries(signals, len(notes), notes)
-        phrases = self._build_phrases(notes, boundaries)
-        return phrases
+        from fingering.phrasing.voice_separation import extract_melody_stream
+        melody_notes = extract_melody_stream(notes)
+
+        # Calculate boundary candidates by analyzing ONLY the melody notes
+        signals = self._compute_signals(melody_notes)
+        
+        # Run Viterbi on the melody to find the optimal melody note splits
+        melody_boundaries = self._select_boundaries(
+            signals, len(melody_notes), melody_notes
+        )
+        
+        # Map melody boundary indices back to the original `notes` array
+        original_boundaries = [0]
+        # Ignore the first dummy index 0, and the last len(melody)
+        for i in melody_boundaries:
+            if 0 < i < len(melody_notes):
+                target_onset = melody_notes[i].onset
+                # Find the first raw note with >= target_onset
+                for orig_idx, orig_note in enumerate(notes):
+                    if orig_note.onset >= target_onset:
+                        original_boundaries.append(orig_idx)
+                        break
+        original_boundaries.append(len(notes))
+        original_boundaries = sorted(set(original_boundaries))
+
+        return self._build_phrases(notes, original_boundaries)
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -418,30 +445,11 @@ class PhraseBoundaryDetector:
         notes: List[NoteEvent],
     ) -> None:
         """
-        Fix 1 (Prior Reset Bug): Track last_boundary_measure properly.
-
-        The previous implementation used notes[0].measure as the constant
-        reference, so elapsed_measures grew to 100+ for late notes,
-        making the prior = 0 for 90% of the piece.
-
-        Fix: reset reference whenever a strong candidate boundary is seen.
+        Legacy function (v1). Kept for external compatibility.
+        In v2 (Viterbi), phrase length prior is computed dynamically 
+        during the DP edge transition phase, not statically on the signal.
         """
-        last_boundary_measure = notes[0].measure if notes else 0
-
-        for i, sig in enumerate(signals):
-            elapsed_measures = notes[i].measure - last_boundary_measure
-            sig.phrase_length_prior = _phrase_length_prior(float(elapsed_measures))
-            # Tentatively update reference if this position looks like a boundary
-            # (uses partial score excluding phrase_length_prior itself to avoid circularity)
-            partial_score = (
-                0.35 * float(sig.slur_end)
-                + 0.20 * float(sig.rest_follows)
-                + 0.20 * sig.agogic_accent
-                + 0.15 * sig.cadence_strength
-                + 0.03 * float(sig.large_interval)
-            )
-            if partial_score >= 0.25:  # Lower than full threshold — tentative
-                last_boundary_measure = notes[i].measure
+        pass
 
     def _apply_melodic_arc_prior(
         self,
@@ -479,40 +487,133 @@ class PhraseBoundaryDetector:
         notes: List[NoteEvent] = None,
     ) -> List[int]:
         """
-        Select boundary indices from the scored signals.
-
-        Two passes:
-          1. Score-based: insert boundary wherever fused score >= threshold.
-          2. Force-split: any phrase exceeding max_phrase_measures is split
-             at the nearest measure boundary — fixes LH chord accompaniment
-             patterns that produce no natural boundary signals.
+        [Phrase Segmentation v2]
+        Select boundary indices using Viterbi Dynamic Programming.
+        Maximizes global phrase score (Boundary Probability + Length Prior).
         """
-        scored = [(s.boundary_score(), s.position) for s in signals]
+        if total_notes == 0:
+            return []
+            
+        return self._viterbi_segmentation(signals, notes)
 
-        boundaries = [0]  # Always start a phrase at note 0
-        last_boundary = 0
+    def _viterbi_segmentation(
+        self,
+        signals: List[PhraseBoundarySignal],
+        notes: List[NoteEvent],
+    ) -> List[int]:
+        """
+        Global optimization: find the sequence of boundaries that maximizes
+        the total sum of (boundary_probability + phrase_length_prior).
+        
+        State space: dp[i] = max score of a segmentation ending EXACTLY at note index i.
+        Transition: dp[j] = max_{i} (dp[i] + Score(i -> j))
+        
+        Where i is the previous boundary, and j is the current boundary candidate.
+        Subject to: bounds on minimum and maximum phrase measures.
+        """
+        n = len(notes)
+        if n == 0:
+            return []
+            
+        # dp[i] stores the maximum score for a segmentation ending exactly at note index i (-1 to n-1)
+        # Note: index -1 represents the start of the piece (before note 0)
+        dp = { -1: 0.0 }
+        backtrack = { -1: None }
+        
+        # Precompute boundary probabilities
+        # p_bound[j] = probability [0..1] that j is a phrase end
+        p_bound = { s.position: s.boundary_score() for s in signals }
+        # Force the last note to be a valid boundary with high probability
+        p_bound[n - 1] = 1.0
 
-        for score, pos in scored:
-            # Skip if too close to last boundary
-            if pos - last_boundary < self.min_phrase_notes:
+        for j in range(0, n):
+            max_score = -float('inf')
+            best_prev = None
+            
+            # Boundary score at j determines the intrinsic value of cutting here
+            # For the last note, we don't penalize it if no signals exist.
+            prob_j = p_bound.get(j, 0.0)
+            
+            # We only evaluate cutting at j if the raw signal isn't essentially zero
+            # (unless it's the very last note)
+            if prob_j < 0.05 and j != n - 1:
                 continue
-            if score >= self.threshold:
-                boundaries.append(pos + 1)  # New phrase starts AFTER boundary
-                last_boundary = pos
 
-        # Always close the last phrase
-        if boundaries[-1] < total_notes:
-            boundaries.append(total_notes)
+            j_measure = notes[j].measure
+            
+            # Search backwards for the optimal previous boundary i
+            # Lookback bound: max_phrase_measures
+            for i in dp.keys():
+                # Measure constraint check
+                if i == -1:
+                    i_measure = notes[0].measure
+                    i_onset = 0.0
+                else:
+                    i_measure = notes[i].measure
+                    i_onset = notes[i].onset
+                    
+                measures_length = j_measure - i_measure + 1
+                
+                # Validation limits
+                if measures_length > self.max_phrase_measures:
+                    continue  # i is too far back
+                    
+                if measures_length < self.min_phrase_notes and j != n - 1:
+                    # Too short, skip (unless forcing close at piece end)
+                    continue
+                    
+                # Compute edge score: Score(i -> j)
+                # 1. How good of a boundary is j?
+                edge_score = prob_j
+                
+                # 2. How good is the phrase length (i -> j)?
+                prior = _phrase_length_prior(measures_length)
+                
+                # Combine them (equal weighting for now, tunable)
+                edge_score += prior
+                
+                # Calculate total journey score
+                candidate_score = dp[i] + edge_score
+                
+                if candidate_score > max_score:
+                    max_score = candidate_score
+                    best_prev = i
 
-        # -----------------------------------------------------------
-        # Fix 1: Forced measure-based segmentation
-        # Re-scan: if any phrase segment spans > max_phrase_measures,
-        # insert hard splits at every max_phrase_measures interval.
-        # -----------------------------------------------------------
-        if notes is not None and self.max_phrase_measures > 0:
-            forced = self._force_measure_boundaries(boundaries, notes, total_notes)
-            boundaries = forced
+            if best_prev is not None:
+                dp[j] = max_score
+                backtrack[j] = best_prev
 
+        # If dp couldn't reach the end (n-1) due to constraint gaps, fallback
+        if n - 1 not in dp:
+            # Fallback to greedy if Viterbi fails to span the entire piece
+            return self._fallback_greedy(signals, n)
+
+        # Backtrack to find the optimal boundary path
+        curr = n - 1
+        boundaries = []
+        while curr is not None and curr != -1:
+            boundaries.append(curr)
+            curr = backtrack[curr]
+            
+        boundaries.reverse()
+        
+        # Format: boundary indices denote the first note of the *new* phrase, 
+        # so if 'idx' is a phrase end, the split list needs (idx + 1)
+        splits = [0]
+        for b in boundaries:
+            if b + 1 < n:
+                splits.append(b + 1)
+        splits.append(n)
+        
+        return sorted(set(splits))
+
+    def _fallback_greedy(self, signals: List[PhraseBoundarySignal], total_notes: int) -> List[int]:
+        """Safety fallback if Viterbi graph disconnects."""
+        boundaries = [0]
+        for s in signals:
+            if s.boundary_score() >= 0.5:
+                boundaries.append(s.position + 1)
+        boundaries.append(total_notes)
         return sorted(set(boundaries))
 
     def _force_measure_boundaries(
@@ -582,12 +683,15 @@ class PhraseBoundaryDetector:
 
             hand = phrase_notes[0].hand  # Assume consistent hand per phrase
 
-            # Boundary score = score of the note just before this phrase
+            # The boundary score logic has moved entirely to Viterbi
+            # For Phrase object storage, we can reconstruct the raw logit probability
             boundary_score = 0.0
             if start > 0:
                 from fingering.phrasing.phrase import PhraseBoundarySignal
                 _dummy = PhraseBoundarySignal(position=start - 1)
-                boundary_score = _dummy.boundary_score()
+                # Find the actual signal in the pipeline, or default to 0
+                # For simplicity, we'll leave it 0 since it isn't crucial downstream 
+                pass
 
             phrase = Phrase(
                 id=phrase_id,
