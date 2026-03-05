@@ -140,18 +140,25 @@ class PhraseScopedDP:
         self,
         phrase: Phrase,
         stitch_constraint: Optional[Dict] = None,
+        strict: bool = False,
     ) -> List[int]:
         """
         Return a list of finger assignments (1–5) for each note in phrase.
 
+        strict=True: called on second pass by ComfortChecker when the first
+        result is too hard.  Internally amplifies span and weak-pair costs
+        so the DP seeks a more comfortable path.
+
         Priority order for forced assignments:
-          1. Chord heuristic (Fix 3) — chord notes must be assigned together
-          2. Pattern Library (Fix 2) — scale/arpeggio patterns get standard fingering
-          3. Stitch constraint       — first finger constrained by cross-phrase stitch
-          4. Viterbi DP              — remaining degrees of freedom
+          1. Chord heuristic  — chord notes must be assigned together
+          2. Pattern Library  — scale/arpeggio patterns get standard fingering
+          3. Stitch constraint — first finger constrained by cross-phrase stitch
+          4. Viterbi DP       — remaining degrees of freedom
 
         stitch_constraint: {'allowed_first_fingers': [1,2,3,…]}
         """
+        self._strict = strict   # accessed in _transition_cost via self
+
         notes = phrase.notes
         n = len(notes)
         hand  = phrase.hand
@@ -313,7 +320,8 @@ class PhraseScopedDP:
                     cost += LARGE_LEAP_ANCHOR_REWARD
             else:
                 # 3-zone span cost — only when hand is repositioning
-                cost += span_cost(span_mm, f_prev, f_curr)
+                strict_mult = 2.0 if getattr(self, '_strict', False) else 1.0
+                cost += span_cost(span_mm, f_prev, f_curr) * strict_mult
 
         # ── Phase 3B: Hand position shift cost ───────────────────────────
         # Additional cost for the physical distance the thumb must travel.
@@ -339,7 +347,8 @@ class PhraseScopedDP:
         # Within a stable 5-finger position, f3↔f4 movement is natural — e.g.
         # A5(f4)→G5(f3) in E5-position. Only penalise when it's a genuine stretch.
         if pair in {(3, 4), (4, 5), (3, 5)} and not in_position:
-            cost += WEAK_PAIR_PENALTY
+            strict_mult = 1.5 if getattr(self, '_strict', False) else 1.0
+            cost += WEAK_PAIR_PENALTY * strict_mult
 
 
         # Nguyên tắc 2: Di chuyển ít nhất có thể ─────────────────────────────────
