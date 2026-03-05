@@ -26,7 +26,7 @@ from fingering.phrasing.score_profile import ScoreProfile
 class PhraseSelectorConfig:
     """Tunable parameters for phrase selection."""
     max_phrase_measures: int = 16   # Hard cap — never create phrase > this
-    min_phrase_measures: int = 2    # Never split below this
+    min_phrase_measures: int = 4    # Pianist never creates < 4m phrases
     cadence_alignment_tolerance: int = 1   # measures of tolerance for cadence match
     confirm_threshold: float = 0.45        # Min bottom-up score to confirm without cadence
     weak_threshold: float = 0.35           # Min score with cadence support
@@ -65,10 +65,16 @@ class PhraseSelector:
 
         cfg = self.config
 
-        # --- Step 1: Convert section changes to FORCED boundaries ---
+        # --- Step 1: Force boundaries at SECTION TRANSITIONS ---
+        # A pianist ends a phrase where one section ends and another begins.
+        # We use section end_measure + 1 (= start of next section) as hard breaks.
         forced_measures: Set[int] = set()
         for s in sections:
-            forced_measures.add(s.start_measure)
+            # Force end-of-section boundaries (where the section completes)
+            forced_measures.add(s.end_measure + 1)
+            # Also force start-of-section for the first occurrence (not repeats)
+            if not s.is_repeat:
+                forced_measures.add(s.start_measure)
 
         # --- Step 2: Evaluate bottom-up candidates ---
         # For each candidate, compute an enhanced score using cadence evidence
