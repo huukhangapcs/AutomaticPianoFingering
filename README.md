@@ -149,7 +149,7 @@ python -m pytest tests/ -q
 
 ### Match rate vs. PIG dataset (Ground Truth annotations)
 
-Benchmark trên 20 file đầu tiên của **PIG Piano Fingering Dataset v1.2** (Right Hand only):
+Benchmark trên 20 file đầu tiên của **PIG Piano Fingering Dataset v1.2** (Right Hand only, 4,550 notes):
 
 | Version | Overall Match Rate | Average File Acc |
 |---|:---:|:---:|
@@ -161,6 +161,8 @@ Benchmark trên 20 file đầu tiên của **PIG Piano Fingering Dataset v1.2** 
 | **+ Biomechanics (tendon + tempo)** | **32.11%** | **32.44%** |
 
 > **Note:** GT annotations reflect personal stylistic preferences. The same piece fingered by different professional pianists differs 30–40%, so ~32% match against a single annotator's style is realistic for a rule-based system.
+
+> **⚠️ Pattern Library Trade-off:** Thực nghiệm cho thấy Pattern Library (hard-coded scale/arpeggio rules) có thể làm **giảm** match rate trong một số cấu hình do xung đột với global Viterbi optimization. Hard rules override cost-optimal paths, gây ra higher-cost solutions ở các nốt xung quanh. Đây là lý do cốt lõi để chuyển sang **neural ranker** ở Phase 3.
 
 ### 🔬 Error Analysis (3,089 wrong predictions)
 
@@ -239,14 +241,19 @@ python scripts/error_analysis.py 20
 
 ### 🚧 Phase 3 — Tiếp theo (Neural)
 
-| Priority | Việc cần làm |
-|----------|-------------|
-| HIGH | **THUMB_MISS fix** — giảm thiên vị ngón cái trong DP cost model |
-| HIGH | **MusicXML parser: tied notes** — skip tied notes đúng cách |
-| HIGH | **Neural baseline** — BI-LSTM/CRF trained on full PIG dataset (309 files) |
-| MED  | **Octave/interval fingering** — 1-5 octaves, 1-3/1-4 thirds |
-| MED  | **Score export** — ghi fingering annotation ngược lại vào MusicXML |
-| LOW  | **Trill/tremolo detection** — alternating finger patterns |
+Rule-based engine đã đạt **trần hiệu suất ~32%**. Bước tiếp theo yêu cầu neural model để vượt ngưỡng này.
+
+| Priority | Việc cần làm | Mục tiêu |
+|----------|-------------|----------|
+| HIGH | **THUMB_MISS fix** — giảm thiên vị ngón cái trong DP cost model | Giảm 47.8% → <30% |
+| HIGH | **MusicXML parser: tied notes** — skip tied notes đúng cách | Accuracy tăng |
+| HIGH | **Neural baseline** — Bi-LSTM/CRF trained trên full PIG (309 files) | MR > 45% |
+| HIGH | **Harmonic Rhythm Fallback** — ngăn mega-phrases ở Development sections | Segmentation quality |
+| HIGH | **Voice separation trong polyphony** — tách multi-voice trong 1 tay | Bach Fugue accuracy |
+| MED  | **Hand-specific weights** — AccompCutter riêng cho LH Alberti/Waltz | LH accuracy |
+| MED  | **Octave/interval fingering** — 1-5 octaves, 1-3/1-4 thirds | Range coverage |
+| MED  | **Score export** — ghi fingering annotation ngược lại vào MusicXML | Usability |
+| LOW  | **Trill/tremolo detection** — alternating finger patterns | Edge cases |
 
 ---
 
