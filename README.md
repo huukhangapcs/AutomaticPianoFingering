@@ -85,7 +85,16 @@ scripts/
 ├── demo_grand_staff.py         # Grand staff demo + GT comparison
 ├── pig_eval.py                 # PIG dataset benchmark
 ├── audit_fingering.py          # Violation audit
-└── error_analysis.py           # Error categorization
+├── error_analysis.py           # Error categorization
+└── pig_eval_simple.py          # Benchmark for Physics-First engine
+```
+
+**New: Physics-First package**
+```
+src/fingering/simple/
+├── __init__.py
+├── fingering_dp.py             # SimpleFingering: Viterbi + 5-cost model (~250 lines)
+└── pipeline.py                 # PianoFingering: thin wrapper
 ```
 
 ---
@@ -101,44 +110,36 @@ python -m pytest tests/ -q
 
 Benchmark: 20 files, Right Hand only, 4,550 notes.
 
-| Version | Overall | Avg/File |
-|---|:---:|:---:|
-| Greedy baseline | 28.9% | — |
-| + Viterbi DP | 30.59% | — |
-| + Biomechanics (tendon, tempo, black key) | 32.11% | 32.44% |
-| + Finger-4 penalty + Black key long finger | 35.47% | 35.66% |
-| + Large leap + Sequential stepwise reward | 37.12% | 37.38% |
-| + Physical Keyboard Model (mm) + Lazy First | 38.00% | 38.21% |
-| + HandState model (thumb_mm tracking) | 44.00% | 43.74% |
-| + Position Planner pre-pass | 45.76% | 45.90% |
-| + WEAK_PAIR in-position exception | 46.88% | 47.12% |
-| + 3-zone finger span model | 47.58% | 47.76% |
-| **+ HandResetType (rest/held note reset)** | **47.36%** | **47.54%** |
+| Version | Overall | Avg/File | Code |
+|---|:---:|:---:|:---:|
+| Greedy baseline | 28.9% | — | — |
+| + Viterbi DP | 30.59% | — | — |
+| + Biomechanics + HandState + Planner | 47.36% | 47.54% | ~2,000 lines |
+| 🔹 **Physics-First (simple/)** | **48.13%** | **48.55%** | **~300 lines** |
 
-> **Note:** Số tuyệt đối 47.36% thấp hơn 47.58% 1 chút do thay đổi cách đo (rerun sạch, không cumulative). Improvement thực sự là +15.9pp so với baseline 31.47%.
+> **Key insight:** Bồ toàn bộ phrase segmentation, intent analysis, pattern library — chỉ giữ vật lý đàn + lazy first + look-ahead — cho kết quả **tốt hơn** và code it hơn 7 lần.
 
-> **Note:** Inter-annotator agreement giữa pianist chuyên nghiệp ~60–70%. Rule-based ceiling thực tế ~50%.
+> Inter-annotator agreement giữa pianist chuyên nghiệp ~60–70%. Rule-based ceiling ~50%.
 
-> **⚠️ Pattern Library trade-off:** Hard-coded scale/arpeggio rules có thể conflict với global Viterbi optimization — đây là lý do cốt lõi để chuyển sang **neural ranker** ở Phase 3.
+### 🔬 Error Analysis — Physics-First Engine (2,360 wrong / 4,550 total)
 
-
-
-### 🔬 Error Analysis — Phase 2.8 (2,468 wrong / 4,550 total)
-
-| Error | Count | % errors | Note |
+| Error type | Count | % errors | Note |
 |---|:---:|:---:|---|
-| **OFF_BY_ONE** | **1,042** | **42.2%** | gt=3 pred=2 — sai 1 ngón |
-| **THUMB_MISS** | **842** | **34.1%** | -636 so với phase cũ ✅ |
-| SCALE_ERROR | 284 | 11.5% | |
-| CHORD_ERROR | 251 | 10.2% | |
-| LARGE_JUMP | 30 | 1.2% | |
-| OTHER | 19 | 0.8% | |
+| **OFF_BY_ONE** | **1,835** | **77.8%** | Biết đúng hand position, sai 1 ngón |
+| OTHER | 261 | 11.1% | Sai xa, jump chức |
+| THUMB_PRED | 220 | 9.3% | Dự đoán thumb quá nhiều |
+| THUMB_MISS | 44 | 1.9% | Bỏ sót thumb |
 
-**Top confusions:** f3→f2 (432x), f2→f1 (315x), f4→f3 (295x)
+**Top confusions (GT → Pred):**
+```
+GT=2 → Pred=1  (-1): 412x    GT=4 → Pred=3  (-1): 233x
+GT=3 → Pred=4  (+1): 231x    GT=2 → Pred=3  (+1): 230x
+GT=4 → Pred=5  (+1): 229x    GT=1 → Pred=2  (+1): 223x
+```
 
-Systematic bias: hệ thống predict ngón **thấp hơn GT 1 bậc** — biết đúng hand position nhưng chọn sai finger trong position.
+**Bias:** Gần đối xứng — predict thấp (54.2%) vs cao (45.8%). OFF_BY_ONE chiếm 77.8% lỗi.
 
-**Fix đã apply:** WEAK_PAIR_PENALTY chỉ fire khi `not in_position` (stretch thật sự), không fire khi f3↔f4 trong cùng anchor.
+**Root cause:** `thumb_mm` của ngón 1–5 được xấp xỉ bằng `(f-1)×23.5mm` nhưng thực tế các ngón không đều nhau — khi người chơi giữ bàn tay kiểu thực, ngón 3 (giữa) dài hơn ngón 1 (cái) nhiều hơn 23.5mm. Cần per-finger anatomical offset thay vì uniform spacing.
 
 ---
 
@@ -149,22 +150,33 @@ pip install -e ".[dev]"
 ```
 
 ```python
+# Physics-First Engine (simple)
 from fingering.io.musicxml_reader import MusicXMLReader
+from fingering.simple import PianoFingering
+
+rh, lh = MusicXMLReader().parse_grand_staff("piece.musicxml")
+pf = PianoFingering(bpm=120.0)
+rh_fingers = pf.run(rh)   # [1, 2, 3, 1, 2, ...]  
+lh_fingers = pf.run(lh)
+```
+
+```python
+# Legacy Complex Engine (phrasing/)
 from fingering.phrasing.pipeline import PhraseAwareFingering
 
-rh, lh, tonic_pc, mode = MusicXMLReader().parse_grand_staff_with_key("piece.musicxml")
-
-paf = PhraseAwareFingering(tonic_pc=tonic_pc)
-rh_fingering = paf.run(rh, companion_notes=lh)  # [1, 2, 3, 1, 2, ...]
-lh_fingering = paf.run(lh, companion_notes=rh)
+paf = PhraseAwareFingering()
+rh_fingers = paf.run(rh, companion_notes=lh)
 ```
 
 ```bash
 # Demo với GT comparison
 python scripts/demo_grand_staff.py test_file/FN7ALfpGxiI.musicxml
 
-# Benchmark
-python scripts/pig_eval.py 20
+# Benchmark — Physics-First
+python scripts/pig_eval_simple.py
+
+# Benchmark — Complex engine
+python scripts/pig_eval.py
 
 # Audit violations
 python scripts/audit_fingering.py test_file/FN7ALfpGxiI.musicxml
