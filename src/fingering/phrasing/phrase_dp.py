@@ -46,8 +46,18 @@ THUMB_UNDER_REWARD  = -2.5   # Extra reward when thumb-under is scale-correct (s
 FINGER_OVER_REWARD  = -1.8   # Reward for correct finger-over (descending RH or ascending LH)
 FINGER_OVER_PENALTY = 2.0    # Penalty for wrong-direction finger-over
 OFOK_PENALTY        = 12.0   # Same finger, different pitch (legato break)
-DIRECTION_REWARD    = -1.0   # Natural finger order alignment
+DIRECTION_REWARD    = -1.8   # Natural finger order alignment (strengthened from -1.0)
 REPEATED_THUMB_PENALTY = 6.0 # Rapid thumb reuse: thumb appearing after only 1-2 intervening fingers
+
+# ── Phase 4: OFF_BY_ONE fix ──────────────────────────────────────────────
+# Bias correction: DP systematically under-estimates finger number.
+# 67.8% of OFF_BY_ONE cases are GT > Pred (predicted too LOW).
+# Two phenomena:
+# 1. Ascending passages: finger order should INCREASE but DP sometimes keeps f=1-2
+# 2. Mid-register notes: finger 1-2 on high notes is ergonomically worse than 3-4
+ASCENDING_FINGER_BIAS  = 0.6  # Light penalty: ascending + finger goes DOWN unexpectedly
+DESCENDING_FINGER_BIAS = 0.4  # Light penalty: descending + finger goes UP unexpectedly
+REGISTER_MISMATCH_COST = 0.5  # Thumb on mid-high note in non-forced context
 
 # ---- Intent modifiers ----
 LEGATO_SUBST_REWARD  = -3.0   # Finger substitution in legato context
@@ -167,6 +177,17 @@ class PhraseScopedDP:
         # On first note of phrase, prefer thumb/index for ascending phrases
         if phrase.arc_type.name in ('CLIMB', 'ARCH') and finger > 3:
             cost += 1.5
+
+        # ── Phase 4: Register mismatch ─────────────────────────────────────
+        # A pianist naturally uses higher fingers (3-4) for mid-range melody notes,
+        # reserving thumb for pivot/crossing situations.
+        # MIDI 65+ (F4 and above) is "mid-high" register for RH.
+        # Penalise using thumb or index when not in a scale/forced context.
+        # This gently pushes the DP away from the systematic "too-low" bias.
+        is_mid_high = note.pitch >= 65    # F4 and above = mid-high register
+        if is_mid_high and finger == 1:
+            # Thumb on F4+ = likely part of a crossing, but if not forced:
+            cost += REGISTER_MISMATCH_COST
         return cost
 
     def _transition_cost(
@@ -210,7 +231,19 @@ class PhraseScopedDP:
         pos_curr = _hand_tracker.infer(note_curr, f_curr)
         cost += _hand_tracker.shift_cost(pos_prev, pos_curr)
 
-        # --- Ergonomic: weak finger pair ---
+        # ── Phase 4: Melodic-direction / finger-direction alignment ──────────
+        # In ascending passages, increasing finger number is natural (thumb-side to pinky).
+        # When RH ascends but finger number DECREASES (except thumb-under crossing),
+        # it implies an awkward position or over-reliance on thumb.
+        # Mirror logic applies for descending.
+        is_thumb_under  = f_curr < f_prev and ascending  and note_curr.hand == 'right'
+        is_finger_over  = f_curr > f_prev and not ascending and note_curr.hand == 'right'
+        # Penalise anti-direction moves that are NOT thumb-under/finger-over crossings
+        if ascending and (f_curr < f_prev) and not is_thumb_under:
+            # Finger going down while melody goes up — adds to low-finger bias
+            cost += ASCENDING_FINGER_BIAS
+        if not ascending and (f_curr > f_prev) and not is_finger_over:
+            cost += DESCENDING_FINGER_BIAS
         pair = (min(f_prev, f_curr), max(f_prev, f_curr))
         if pair in {(3, 4), (4, 5), (3, 5)}:
             cost += WEAK_PAIR_PENALTY
