@@ -109,7 +109,8 @@ Benchmark: 20 files, Right Hand only, 4,550 notes.
 | + Large leap + Sequential stepwise reward | 37.12% | 37.38% |
 | + Physical Keyboard Model (mm) + Lazy First | 38.00% | 38.21% |
 | + HandState model (thumb_mm tracking) | 44.00% | 43.74% |
-| **+ Position Planner pre-pass** | **45.76%** | **45.90%** |
+| + Position Planner pre-pass | 45.76% | 45.90% |
+| **+ WEAK_PAIR in-position exception** | **46.88%** | **47.12%** |
 
 > **Note:** Inter-annotator agreement giữa pianist chuyên nghiệp ~60–70%. Rule-based ceiling thực tế ~50%.
 
@@ -128,7 +129,9 @@ Benchmark: 20 files, Right Hand only, 4,550 notes.
 
 **Top confusions:** f3→f2 (432x), f2→f1 (315x), f4→f3 (295x)
 
-Systematic bias: hệ thống predict ngón **thấp hơn GT 1 bậc** — biết đúng hand position nhưng chọn sai finger trong position. Next target: tuning finger bias trong cùng anchor.
+Systematic bias: hệ thống predict ngón **thấp hơn GT 1 bậc** — biết đúng hand position nhưng chọn sai finger trong position.
+
+**Fix đã apply:** WEAK_PAIR_PENALTY chỉ fire khi `not in_position` (stretch thật sự), không fire khi f3↔f4 trong cùng anchor.
 
 ---
 
