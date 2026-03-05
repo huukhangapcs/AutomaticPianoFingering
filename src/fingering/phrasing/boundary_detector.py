@@ -589,3 +589,41 @@ class PhraseBoundaryDetector:
             phrases.append(phrase)
 
         return phrases
+
+    def _build_phrases_from_indices(
+        self,
+        notes: List[NoteEvent],
+        boundary_note_indices: List[int],
+    ) -> List[Phrase]:
+        """
+        Adapter: convert PhraseSelector's flat boundary list to Phrase objects.
+
+        PhraseSelector returns indices of the LAST note of each phrase segment.
+        This converts them to (start, end) slice pairs for _build_phrases.
+
+        Args:
+            notes: full note stream
+            boundary_note_indices: sorted list of note indices where phrases end
+
+        Returns:
+            List[Phrase], one per segment
+        """
+        if not notes:
+            return []
+
+        if not boundary_note_indices:
+            # No boundaries → one big phrase
+            return self._build_phrases(notes, [0, len(notes)])
+
+        # Convert "last note of phrase" indices → start positions
+        # A boundary at idx i means phrase ends at notes[i] → next phrase starts at i+1
+        starts = [0]
+        for idx in sorted(set(boundary_note_indices)):
+            next_start = idx + 1
+            if 0 < next_start < len(notes):
+                starts.append(next_start)
+
+        # Close with the total length
+        starts.append(len(notes))
+
+        return self._build_phrases(notes, sorted(set(starts)))
