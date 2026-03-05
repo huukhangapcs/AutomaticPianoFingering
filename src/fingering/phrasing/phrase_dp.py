@@ -20,6 +20,7 @@ from fingering.models.note_event import NoteEvent
 from fingering.core.keyboard import (
     white_key_span, finger_span_limits, is_ascending,
     natural_finger_order, thumb_crossing_natural,
+    black_key_span_correction, tendon_coupling_penalty, tempo_adjusted_max_span,
 )
 from fingering.phrasing.phrase import Phrase, PhraseIntent
 from fingering.phrasing.pattern_library import apply_pattern_constraints
@@ -170,16 +171,34 @@ class PhraseScopedDP:
         cost = 0.0
         span = white_key_span(note_prev, note_curr)
         ascending = is_ascending(note_prev, note_curr)
-        _, max_span = finger_span_limits(f_prev, f_curr)
 
-        # --- Ergonomic: stretch ---
-        over = max(0, span - max_span)
+        # ── Biomechanics: black key geometry correction ────────────────────
+        # Black keys are physically closer → effective span is smaller
+        bk_correction = black_key_span_correction(note_prev, note_curr)
+        effective_span = span + bk_correction  # bk_correction is negative
+
+        # ── Biomechanics: tempo-aware max span ────────────────────────
+        bpm = getattr(note_curr, 'tempo', 120.0) or 120.0
+        adjusted_max = tempo_adjusted_max_span(f_prev, f_curr, bpm)
+
+        # ── Ergonomic: stretch ────────────────────────────────────
+        # Use effective_span vs tempo-adjusted max
+        over = max(0.0, effective_span - adjusted_max)
         cost += over ** 2 * STRETCH_WEIGHT
 
         # --- Ergonomic: weak finger pair ---
         pair = (min(f_prev, f_curr), max(f_prev, f_curr))
         if pair in {(3, 4), (4, 5), (3, 5)}:
             cost += WEAK_PAIR_PENALTY
+
+        # ── Biomechanics: tendon coupling penalty ────────────────────
+        # Ring finger (4) shares a tendon with middle (3).
+        # At speed, alternating 3-4 or 4-5 is much harder than 1-2 or 2-3.
+        cost += tendon_coupling_penalty(
+            f_prev, f_curr,
+            note_duration=note_curr.duration,
+            bpm=bpm,
+        )
 
         # --- Ergonomic: black key penalties ---
         if note_curr.is_black:
