@@ -143,10 +143,25 @@ class PhraseAwareFingering:
         """
         rh = notes
         lh = companion or []
+        is_left_hand = len(notes) > 0 and notes[0].hand == 'left'
 
         # Layer 0: build global score profile (Fix 1: with key sig tonic if available)
         score_profile = build_score_profile(rh, lh, tonic_pc_override=self.tonic_pc)
 
+        if is_left_hand:
+            # ----- Left Hand: Segment strictly by measure -----
+            boundaries = []
+            for i in range(len(notes) - 1):
+                if notes[i].measure != notes[i + 1].measure:
+                    boundaries.append(i)
+            # Add the final note as the end of the last phrase
+            if not boundaries or boundaries[-1] != len(notes) - 1:
+                boundaries.append(len(notes) - 1)
+                
+            phrases = self.detector._build_phrases_from_indices(notes, boundaries)
+            return phrases
+
+        # ----- Right Hand: Full Phrase Segmentation -----
         # Layer 1: motif-based form detection (Fix 2: phrase-level motif lengths)
         sections: List[Section] = []
         if self.use_motif_engine and len(notes) >= 8:

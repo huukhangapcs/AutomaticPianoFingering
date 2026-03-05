@@ -54,6 +54,7 @@ class PhraseBoundarySignal:
     agogic_accent: float = 0.0       # Current note is locally longest (0–1 strength)
     melodic_resolution: float = 0.0  # Stepwise descent into long note (0–1)
     harmonic_cadence: float = 0.0    # Bass movement suggesting V→I or similar (0–1)
+    melodic_leap_compensation: float = 0.0 # Leap >= P4 followed by stepwise resolution (0-1)
 
     def boundary_score(self) -> float:
         """
@@ -65,6 +66,7 @@ class PhraseBoundarySignal:
           agogic_accent   = 0.20  (primary signal in absence of slurs)
           cadence_strength= 0.15  (harmonic + metric cues combined)
           harmonic_cadence= 0.15  (bass V→I motion)
+          melodic_leap    = 0.12  (leap >= P4 then stepwise resolution)
           melodic_resol.  = 0.10  (stepwise descent into breathpoint)
           downbeat        = 0.10  (next note is beat 1 of new measure)
           phrase_len_prior= 0.10  (classical phrase length norms)
@@ -97,6 +99,7 @@ class PhraseBoundarySignal:
                 
         score += 0.15 * self.cadence_strength                        # metric + interval
         score += 0.18 * self.harmonic_cadence                        # bass V→I (now precise)
+        score += 0.12 * self.melodic_leap_compensation               # leap >= P4, stepwise resolve
         score += 0.10 * self.melodic_resolution                      # stepwise descent
         score += 0.10 * float(self.next_note_is_downbeat)            # phrase lands on 1
         score += 0.10 * self.phrase_length_prior                     # 4/8 bar norm

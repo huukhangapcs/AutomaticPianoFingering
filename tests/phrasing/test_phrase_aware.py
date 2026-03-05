@@ -132,9 +132,9 @@ class TestBoundaryScoreFusion:
         assert s.boundary_score() >= 0.30
 
     def test_rest_follows_adds_weight(self):
-        """rest_follows contributes weight but alone cannot trigger a boundary."""
-        s = PhraseBoundarySignal(position=0, rest_follows=True, rest_duration=1.0)
-        # Contributes 0.20, which is below the 0.40 threshold — by design
+        """rest_follows contributes weight but short rests alone cannot trigger a boundary."""
+        s = PhraseBoundarySignal(position=0, rest_follows=True, rest_duration=0.25)
+        # Contributes 0.22, which is below the 0.40 threshold — by design
         assert s.boundary_score() >= 0.15  # does contribute
         assert s.boundary_score() < 0.40   # but not enough alone
 

@@ -360,6 +360,14 @@ class PhraseBoundaryDetector:
             if next_note is not None:
                 sig.large_interval = abs(next_note.pitch - note.pitch) > 7
 
+            # --- Melodic Leap Compensation ---
+            # Phrase ends after a large leap (>= P4, 5 semitones) that is followed by a stepwise resolution (<= 2 semitones)
+            if prev_note is not None and next_note is not None:
+                leap = abs(note.pitch - prev_note.pitch)
+                resolution = abs(next_note.pitch - note.pitch)
+                if leap >= 5 and resolution <= 2:
+                    sig.melodic_leap_compensation = 1.0
+
             # -----------------------------------------------------------
             # Improvement 2: Metric position weighting
             # Phrase boundary is confirmed when the NEXT note is beat 1

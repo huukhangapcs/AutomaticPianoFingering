@@ -37,6 +37,7 @@ MusicXML File
 │    • [Imp 1] Melodic Arc Detector (ARCH/CLIMB/FALL) │
 │    • [Imp 2] Metric Position Weighting (downbeat)   │
 │    • [Imp 3] Phrase Length Prior (2/4/8 measures)   │
+│    • [Imp 4] Melodic Leap Compensation (>= P4)      │
 │    • [Fix 1] Forced segmentation (max 4 measures)   │
 │                                                     │
 │  Layer B: PhraseIntentAnalyzer                      │
@@ -114,7 +115,7 @@ Tested on `FN7ALfpGxiI.musicxml` (grand staff, 199 measures):
 | Hand | Notes | GT Annotated | Match Rate |
 |------|-------|:------------:|:----------:|
 | Right Hand | 524 | 433 | **28.9%** |
-| Left Hand  | 496 | 146 | **27.4%** |
+| Left Hand  | 496 | 146 | **28.8%** (↑ từ 27.4%) |
 
 > **Note:** GT annotations cover ~55% of total notes. Many mismatches reflect
 > personal stylistic preferences (the same piece fingered by different pianists
@@ -128,7 +129,7 @@ Thuật toán cắt Segment hiện tại được thiết kế theo tư duy **nh
 2. **Cấu trúc Hỏi - Đáp (Question & Answer):** Hệ thống tích hợp `PeriodDetector` dựa trên hệ quả Harmonic Skeleton (nhận dạng Cadence V-I hoặc I-V). Nhờ đó, nó tự động dán nhãn các phrases nối tiếp nhau thành cặp **Antecedent (Câu hỏi)** và **Consequent (Câu trả lời)**, ví dụ từ phân tích Für Elise: `P1 (antecedent) -> P2 (consequent)`.
 3. **Phân tích Multi-Layer Constraint:**
    - *Top-down:* `MotifEngine` (tìm form A-B-A ở cấp độ 8, 12, 16 notes).
-   - *Bottom-up:* `PhraseBoundaryDetector` (tìm các tín hiệu rests, slurs, khoảng cách nốt).
+   - *Bottom-up:* `PhraseBoundaryDetector` (tìm các tín hiệu rests, slurs, khoảng cách nốt, melodic leap).
    - *Harmonic:* `ScoreProfile` tự động đọc `<key>` MusicXML để xác định đúng Tonic, hỗ trợ detect Harmony.
 4. **Xử lý Pedal Point Khó:** Hệ thống giữ lại được các *dominant pedal point* dài (ví dụ đoạn lặp bass trống dồn dập 24 ô nhịp trước khi về chủ đề A trong Für Elise), chứng tỏ tính linh hoạt không cắt mù quáng khi đoạn nhạc chưa "giải quyết" (resolve) về mặt hòa âm.
 
@@ -140,9 +141,10 @@ Kết quả ghi nhận một hiện tượng vô cùng thú vị ("Pattern Libra
 - **Chỉ chạy Viterbi DP thuần túy:** Khớp `31.47%` với Ground Truth của chuyên gia.
 - **Bật thêm Pattern Library (Ép ngón theo chuẩn Scale/Arpeggio):** Khớp `30.59%` (Giảm nhẹ).
 
-**Tại sao rules cứng nhắc lại làm giảm độ chính xác?**
+**Tại sao rules cứng nhắc lại làm giảm độ chính xác? (RH)**
 1. **Bối cảnh (Context) quan trọng hơn Khuôn mẫu (Pattern):** Khi ép một chuỗi nốt chạy lên (scalar run) theo pattern cố định `1-2-3-4-5`, rule này có thể vô tình ép ngón cái (ngón 1) rơi vào một phím đen rải rác bên trong thang âm. Thuật toán Viterbi DP tự nhiên (khi không bị ép) đủ thông minh để lách ngón cái khỏi phím đen bằng cách trượt ngón `3-4` dài hơn, tạo ra đường tiếng mượt mà hơn. Khi bị hard-code đè lên, nó vỡ form.
-2. **Sự bất cân xứng của Tay Trái (LH) và Tay Phải (RH):** Hệ thống phân đoạn (Segmentation) hiện tại đang đối xử tay trái đệm (Alberti Bass) giống hệt tay phải giai điệu (Melody). Tay trái thường chạy liên tục không ngừng nghỉ (không có rests, không có agogic accent), khiến hệ thống không tìm được ranh giới phrase tự nhiên và phải dùng đến cơ chế "chặt ngang" (forced cut mỗi 12 measures), làm gãy đường ngón tay Viterbi.
+
+*✅ (Đã Fix) Sự bất cân xứng T/P: Thuật toán nay đã tách biệt Hand-Specific logic (RH=Phrase, LH=Measure).*
 
 **Kết luận Phase 2:**
 Tư duy dùng Rule gò ép (Symbolic logic) đã chạm mức trần sinh học của nó. Máy tính tính toán Ergonomics matrix còn chuẩn xác hơn cả Rule do con người viết ra. Việc giải quyết các case luồn ngón cái phức tạp đòi hỏi sự uyển chuyển của **Mạng Nơ-ron (Deep Learning)**. Đây là tiền đề hoàn hảo để hệ thống tiến thẳng vào **Phase 3: Hybrid Neuro-Symbolic (BI-LSTM + CRF)**.
@@ -209,7 +211,6 @@ python scripts/demo_grand_staff.py test_file/FN7ALfpGxiI.musicxml
 | Priority | Việc cần làm |
 |----------|-------------|
 | HIGH | **Pattern Library mở rộng** — inject specific broken-chord patterns (GT đang khác vì player dùng 4-5-1-2 thay 1-2-3-4) |
-| HIGH | **Hand Motion Segmentation (HMS)** — thay vì phrase-level, segment theo hand position shift |
 | HIGH | **MusicXML parser: nốt nối (tie)** — hiện chưa skip tied notes đúng cách |
 | MED  | **Data Layer** — PIG dataset loader (150 pieces, multi-annotator) |
 | MED  | **Neural baseline** — BI-LSTM/CRF trained on PIG dataset |
