@@ -343,8 +343,13 @@ class PhraseScopedDP:
         if not ascending and (f_curr > f_prev) and not is_finger_over:
             cost += DESCENDING_FINGER_BIAS
         pair = (min(f_prev, f_curr), max(f_prev, f_curr))
-        if pair in {(3, 4), (4, 5), (3, 5)}:
+        # Tendon coupling penalty: pairs (3,4), (4,5), (3,5) are physically weak.
+        # EXCEPTION: skip when BOTH notes are in the same hand position.
+        # Within a stable 5-finger position, f3↔f4 movement is natural — e.g.
+        # A5(f4)→G5(f3) in E5-position. Only penalise when it's a genuine stretch.
+        if pair in {(3, 4), (4, 5), (3, 5)} and not in_position:
             cost += WEAK_PAIR_PENALTY
+
 
         # Nguyên tắc 2: Di chuyển ít nhất có thể ─────────────────────────────────
         # Khi note liền bậc (semitone 1-2), nếu ngón cũng tăng đều (f+1 khi ascending
