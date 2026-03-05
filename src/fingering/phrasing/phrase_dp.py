@@ -36,7 +36,10 @@ WEAK_PAIR_PENALTY   = 3.0    # Extra penalty for 3-4-5 finger combos
 THUMB_ON_BLACK      = 5.0    # Thumb on black key
 PINKY_ON_BLACK      = 2.5    # Pinky on black key
 CROSSING_STANDARD   = 2.5    # Finger crossing (non-scale contexts)
-CROSSING_THUMB_UNDER = 1.0   # Thumb under (standard in scales) — low
+CROSSING_THUMB_UNDER = 1.0   # Thumb-under (standard in scales) — low
+THUMB_UNDER_REWARD  = -1.5   # Extra reward when thumb-under is scale-correct
+FINGER_OVER_REWARD  = -1.2   # Reward for correct finger-over (descending RH or ascending LH)
+FINGER_OVER_PENALTY = 2.0    # Penalty for wrong-direction finger-over
 OFOK_PENALTY        = 12.0   # Same finger, different pitch (legato break)
 DIRECTION_REWARD    = -1.0   # Natural finger order alignment
 
@@ -199,13 +202,45 @@ class PhraseScopedDP:
                 crossing = True
             if ascending and f_curr > f_prev and f_prev != 1:
                 crossing = True
+                
         if crossing:
-            if f_curr == 1 and note_curr.is_black:
+            # --- Thumb-Under (Luyền Ngón Luồn) ---
+            # Occurs when the THUMB (f=1) crosses UNDER a higher finger.
+            # Standard technique for ascending scale in RH (or descending LH).
+            # More natural when the thumb will land on a WHITE key.
+            is_thumb_under = (
+                (hand == 'right' and ascending and f_curr == 1)
+                or (hand == 'left' and not ascending and f_curr == 1)
+            )
+            # --- Finger-Over (Vắt Ngón) ---
+            # The opposite: a higher finger (2,3,4) crosses OVER the thumb.
+            # Standard for descending RH (or ascending LH).
+            # Example: RH descending, f_prev=1, f_curr=3 — finger 3 vaults over thumb.
+            is_finger_over = (
+                (hand == 'right' and not ascending and f_prev == 1 and f_curr in (2, 3, 4))
+                or (hand == 'left' and ascending and f_prev == 1 and f_curr in (2, 3, 4))
+            )
+
+            if note_curr.is_black and f_curr == 1:
+                # Absolute worst case: thumb-under landing on a black key
                 cost += CROSSING_STANDARD + 4.0
+            elif is_thumb_under:
+                cost += CROSSING_THUMB_UNDER
+                # Bonus reward when this thumb-under aligns with scale motion
+                # (Note lands on white key and is part of a stepwise passage)
+                semitone = abs(note_curr.pitch - note_prev.pitch)
+                if not note_curr.is_black and semitone <= 4:
+                    cost += THUMB_UNDER_REWARD   # negative = reward!  
+            elif is_finger_over:
+                cost += CROSSING_THUMB_UNDER
+                # Bonus reward for correct finger-over in descending/ascending context
+                semitone = abs(note_curr.pitch - note_prev.pitch)
+                if not note_curr.is_black and semitone <= 4:
+                    cost += FINGER_OVER_REWARD   # negative = reward!
             elif thumb_crossing_natural(f_prev, f_curr, ascending, hand):
                 cost += CROSSING_THUMB_UNDER  # Standard scale thumb motion
             else:
-                cost += CROSSING_STANDARD
+                cost += CROSSING_STANDARD       # Non-standard crossing
 
         # --- Ergonomic: same finger on different pitch (OFOK) ---
         if f_curr == f_prev and note_prev.pitch != note_curr.pitch:

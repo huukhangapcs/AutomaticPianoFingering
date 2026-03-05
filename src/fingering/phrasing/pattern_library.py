@@ -1,5 +1,5 @@
 """
-Pattern Library — Fix 2.
+Pattern Library — v2.
 
 Detects known scale and arpeggio patterns in a note sequence and
 injects hard-coded finger constraints into the phrase DP.
@@ -8,17 +8,30 @@ A pianist immediately recognizes recurring patterns (C major scale,
 broken chord arpeggios, etc.) and applies memorized fingering rather
 than computing from scratch.
 
+New in v2:
+  - Tone-specific scale fingering for all 12 major keys (via scale_fingering.py)
+  - Hanon 5-finger exercise pattern detection for runs < 9 notes
+  - Finger-over (vắt ngón) detection for descending RH passages
+
 Supported patterns:
-  - Major scale (ascending / descending)
+  - Major scale (ascending / descending) — tone-specific
+  - Natural minor scale — tone-specific
   - Pentatonic scale
   - Broken chord arpeggio (triad spread 1-3-5)
   - Alberti bass (LH only)
+  - Hanon 5-finger exercise
 """
 
 from __future__ import annotations
 from typing import List, Optional, Tuple
 from dataclasses import dataclass, field
 from fingering.models.note_event import NoteEvent
+from fingering.phrasing.scale_fingering import (
+    get_major_scale_fingering,
+    get_minor_scale_fingering,
+    get_hanon_fingering,
+    detect_scale_tonic,
+)
 
 # ──────────────────────────────────────────────────────────────
 # Semitone intervals for well-known patterns
@@ -40,9 +53,8 @@ _TRIAD_STEPS       = (4, 3)   # ascending root-position triad
 # Standard fingerings per pattern (RH ascending, LH is mirrored)
 # ──────────────────────────────────────────────────────────────
 
-# RH major scale: 1–2–3–1–2–3–4–5 (C position, no black keys)
+# Fallback fingering if tonic lookup fails (C major standard)
 _RH_SCALE_FINGERS  = [1, 2, 3, 1, 2, 3, 4, 5]
-# LH major scale descending reads the same fingering for descending pitch:
 _LH_SCALE_FINGERS  = [5, 4, 3, 2, 1, 3, 2, 1]
 
 # RH broken-chord (E–G–C or similar root-pos triad ascending)
@@ -52,6 +64,13 @@ _LH_ARPEGGIO_3     = [5, 3, 1]   # mirror
 # RH broken chord with octave: 1-2-4-1-2-4-...
 _RH_ARPEGGIO_EXT   = [1, 2, 4, 1, 2, 4]
 _LH_ARPEGGIO_EXT   = [5, 3, 1, 5, 3, 1]
+
+# Hanon 5-finger pattern: ascending 1-2-3-4-5 + descending 4-3-2-1
+# Typically used for passages of 4-8 stepwise notes without thumb crossing
+_HANON_5_ASCENDING_RH  = [1, 2, 3, 4, 5]
+_HANON_5_DESCENDING_RH = [5, 4, 3, 2, 1]
+_HANON_5_ASCENDING_LH  = [5, 4, 3, 2, 1]
+_HANON_5_DESCENDING_LH = [1, 2, 3, 4, 5]
 
 
 @dataclass
@@ -125,6 +144,8 @@ class PatternLibrary:
                 or self._try_scale(notes, i, hand, _PENTATONIC_STEPS, 'pentatonic')
                 # Arpeggio
                 or self._try_arpeggio(notes, i, hand)
+                # Hanon 5-finger (before scalar run for higher priority)
+                or self._try_hanon(notes, i, hand)
                 # Partial scale (4–7 notes) — fallback, higher min_len to reduce false positives
                 or self._try_scale_partial(notes, i, hand, _MAJOR_SCALE_STEPS, 'major_scale_partial', min_len=4)
                 or self._try_scale_partial(notes, i, hand, _MINOR_SCALE_STEPS, 'minor_scale_partial', min_len=4)
@@ -147,6 +168,7 @@ class PatternLibrary:
     ) -> Optional[PatternMatch]:
         """
         Try to match a full octave scale (8 notes) starting at `start`.
+        Uses tone-specific fingering from scale_fingering.py for accuracy.
         """
         length = len(template) + 1  # e.g. 8 notes for major scale
         if start + length > len(notes):
@@ -158,11 +180,21 @@ class PatternLibrary:
         if not _matches_template(steps, template, ascending):
             return None
 
-        # Assign fingering based on hand + direction
-        if hand == 'right':
-            fingers = _RH_SCALE_FINGERS if ascending else list(reversed(_LH_SCALE_FINGERS))
+        # Detect tonic pitch class from starting note
+        tonic_pc = detect_scale_tonic(notes[start:start+length], template)
+        
+        # Lookup tone-specific fingering from the scale database
+        if 'minor' in name:
+            fingers = get_minor_scale_fingering(tonic_pc, hand, ascending)
         else:
-            fingers = _LH_SCALE_FINGERS if not ascending else list(reversed(_RH_SCALE_FINGERS))
+            fingers = get_major_scale_fingering(tonic_pc, hand, ascending)
+        
+        if fingers is None:
+            # Fallback to C major standard position
+            if hand == 'right':
+                fingers = _RH_SCALE_FINGERS if ascending else list(reversed(_LH_SCALE_FINGERS))
+            else:
+                fingers = _LH_SCALE_FINGERS if not ascending else list(reversed(_RH_SCALE_FINGERS))
 
         # Trim to exactly `length` fingers
         fingers = fingers[:length]
@@ -276,6 +308,65 @@ class PatternLibrary:
             end_idx=start + length,
             pattern=f"arpeggio_{'asc' if ascending else 'desc'}",
             fingers=template[:length],
+        )
+
+
+    def _try_hanon(
+        self,
+        notes: List[NoteEvent],
+        start: int,
+        hand: str,
+    ) -> Optional[PatternMatch]:
+        """
+        Detect Hanon 5-finger exercise pattern:
+        - Purely stepwise motion (whole/half steps only)
+        - Length between 5-9 notes
+        - Does NOT require a thumb crossing (stays within 5 fingers)
+        
+        This is activated when the note run is too short for a full thumbed scale
+        but too long to be a random interval. The output is a compact 1-2-3-4-5
+        style fingering without thumb-under, ideal for rapid 5-finger passages.
+        """
+        n = len(notes)
+        if start + 4 >= n:
+            return None
+
+        # Determine direction from first two notes
+        if start + 1 >= n:
+            return None
+        ascending = notes[start + 1].pitch > notes[start].pitch
+
+        # Grow the run while it stays purely stepwise
+        length = 1
+        direction_sign = 1 if ascending else -1
+        for i in range(1, min(9, n - start)):   # Hanon max 9 notes
+            interval = notes[start + i].pitch - notes[start + i - 1].pitch
+            if interval * direction_sign in (1, 2):  # Half or whole step same direction
+                length += 1
+            else:
+                break
+
+        # Must be at least 5 notes to qualify as Hanon exercise
+        if length < 5:
+            return None
+
+        # Confirm it does NOT span a full octave (that would be a scale)
+        total_span = abs(notes[start + length - 1].pitch - notes[start].pitch)
+        if total_span >= 12:
+            return None  # Let _try_scale handle full-octave patterns
+
+        # Assign 5-finger pattern (no thumb crossing needed)
+        if hand == 'right':
+            fingers = (_HANON_5_ASCENDING_RH if ascending else _HANON_5_DESCENDING_RH)[:length]
+        else:
+            fingers = (_HANON_5_ASCENDING_LH if ascending else _HANON_5_DESCENDING_LH)[:length]
+
+        return PatternMatch(
+            start_idx=start,
+            end_idx=start + length,
+            pattern=f"hanon5_{'asc' if ascending else 'desc'}",
+            fingers=fingers,
+            confidence=0.85,
         )
 
 
