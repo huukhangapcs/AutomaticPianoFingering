@@ -28,8 +28,10 @@ from fingering.phrasing.pattern_library import apply_pattern_constraints
 from fingering.phrasing.chord_heuristic import build_forced_constraints
 from fingering.phrasing.thumb_placement_planner import apply_thumb_constraints
 from fingering.phrasing.hand_position import HandPositionTracker, apply_five_finger_constraints
+from fingering.phrasing.position_planner import PositionPlanner
 
-_hand_tracker = HandPositionTracker()  # Stateless, shared instance
+_hand_tracker = HandPositionTracker()   # Stateless, shared instance
+_pos_planner  = PositionPlanner()        # Stateless, shared instance
 
 # ---- Finger classification ----
 STRONG_FINGERS = {2, 3}       # Most reliable, good touch control
@@ -80,6 +82,12 @@ IN_POSITION_REWARD = -1.5   # Note nằm trong tầm tay → không cần di chu
 LARGE_LEAP_THRESHOLD    = 6    # white keys (~quảng 6 trở lên)
 LARGE_LEAP_REPOSITION_COST = 4.0  # Chi phí cố định khi reposition
 LARGE_LEAP_ANCHOR_REWARD = -3.0   # Reward cho landing finger phù hợp với hướng leap
+
+# ── Position Planner anchor reward ──────────────────────────────────────────
+# Khi DP chọn finger khớp với anchor được recommend bởi PositionPlanner,
+# add reward mạnh. Reward này accumulate qua nhiều nốt liên tiếp trong cùng
+# position → làm stable positions "sticky" thay vì chỉ pairwise.
+POSITION_ANCHOR_REWARD = -2.0  # Per note matching anchor
 
 # ── Phase 4: OFF_BY_ONE fix ──────────────────────────────────────────────
 # Bias correction: DP systematically under-estimates finger number.
@@ -167,6 +175,14 @@ class PhraseScopedDP:
         climax_skip = {phrase.climax_idx} if phrase.climax_idx is not None else set()
         forced = apply_five_finger_constraints(notes, hand, forced, skip_indices=climax_skip)
 
+        # -----------------------------------------------------------
+        # Phase 2.8: Position Planner pre-pass
+        # Run before DP to get per-note anchor suggestions.
+        # anchor_mm[i] = recommended thumb_mm for note i (or None).
+        # -----------------------------------------------------------
+        hand = phrase.hand
+        anchor_mm = _pos_planner.plan(notes, hand=hand)
+
         dp   = np.full((n, N_FINGERS + 1), INF)
         prev = np.zeros((n, N_FINGERS + 1), dtype=int)
 
@@ -182,7 +198,7 @@ class PhraseScopedDP:
             allowed_first = [forced[0]]
 
         for f in allowed_first:
-            dp[0, f] = self._init_cost(notes[0], f, phrase)
+            dp[0, f] = self._init_cost(notes[0], f, phrase, anchor_mm[0])
 
         # --- Fill DP table ---
         for i in range(1, n):
@@ -201,6 +217,7 @@ class PhraseScopedDP:
                         notes[i - 1], f_prev,
                         notes[i],    f_curr,
                         phrase.intent, tension, is_climax,
+                        anchor_curr=anchor_mm[i],
                     )
                     total = dp[i - 1, f_prev] + cost
                     if total < dp[i, f_curr]:
@@ -214,34 +231,33 @@ class PhraseScopedDP:
     # Cost components
     # ------------------------------------------------------------------
 
-    def _init_cost(self, note: NoteEvent, finger: int, phrase: Phrase) -> float:
+    def _init_cost(self, note: NoteEvent, finger: int, phrase: Phrase,
+                   anchor_mm=None) -> float:
         cost = 0.0
         if note.is_black and finger == 1:
             cost += THUMB_ON_BLACK
         if note.is_black and finger == 5:
             cost += PINKY_ON_BLACK
-        # Nguyên tắc 11: reward ngón dài trên phím đen (init note)
         if note.is_black and finger in (2, 3, 4):
-            cost += BLACK_KEY_LONG_FINGER_REWARD  # negative = reward
-        # On first note of phrase, prefer thumb/index for ascending phrases
+            cost += BLACK_KEY_LONG_FINGER_REWARD
         if phrase.arc_type.name in ('CLIMB', 'ARCH') and finger > 3:
             cost += 1.5
-
-        # Nguyên tắc 5: soft penalty cho ngón 4 ở đầu phrase
         if finger == 4:
             cost += FINGER4_SOLO_PENALTY
-
-        # ── Phase 4: Register mismatch ─────────────────────────────────────
-        # A pianist naturally uses higher fingers (3-4) for mid-range melody notes,
-        # reserving thumb for pivot/crossing situations.
-        # MIDI 65+ (F4 and above) is "mid-high" register for RH.
-        # Penalise using thumb or index when not in a scale/forced context.
-        # Exception: CLIMB/ARCH arc → thumb as anchor for 1→2→3 is natural.
-        is_mid_high = note.pitch >= 65    # F4 and above = mid-high register
+        is_mid_high = note.pitch >= 65
         is_ascending_phrase = phrase.arc_type.name in ('CLIMB', 'ARCH')
         if is_mid_high and finger == 1 and not is_ascending_phrase:
-            # Thumb on F4+ = likely part of a crossing, but if not forced:
             cost += REGISTER_MISMATCH_COST
+        # Phase 2.8: Position anchor reward for first note
+        if anchor_mm is not None:
+            from fingering.core.keyboard import physical_key_position_mm, _WHITE_KEY_WIDTH_MM as _WK
+            hand = getattr(note, 'hand', 'right')
+            off = (finger - 1) * _WK
+            implied_thumb = (physical_key_position_mm(note.pitch) - off
+                             if hand == 'right'
+                             else physical_key_position_mm(note.pitch) + off)
+            if abs(implied_thumb - anchor_mm) < 12.0:
+                cost += POSITION_ANCHOR_REWARD
         return cost
 
     def _transition_cost(
@@ -251,6 +267,7 @@ class PhraseScopedDP:
         intent: PhraseIntent,
         tension: float,
         is_climax: bool,
+        anchor_curr: float | None = None,
     ) -> float:
         cost = 0.0
         span = white_key_span(note_prev, note_curr)
@@ -460,9 +477,21 @@ class PhraseScopedDP:
         # -----------------------------------------------------------
         if tension > 0.5:
             misaligned = not natural_finger_order(f_prev, f_curr, ascending, note_curr.hand)
-            # Don't penalize thumb-under (it's a special move, not misalignment)
             if misaligned and not thumb_crossing_natural(f_prev, f_curr, ascending, note_curr.hand):
                 cost += ARC_MISALIGN_PENALTY * tension
+
+        # ── Phase 2.8: Position Planner anchor reward ─────────────────────
+        # Reward when the chosen finger matches the pre-planned anchor.
+        # Accumulated over multiple notes → stable positions become "sticky".
+        if anchor_curr is not None:
+            hand = note_curr.hand
+            from fingering.core.keyboard import physical_key_position_mm, _WHITE_KEY_WIDTH_MM as _WK
+            off = (f_curr - 1) * _WK
+            implied_thumb = (physical_key_position_mm(note_curr.pitch) - off
+                             if hand == 'right'
+                             else physical_key_position_mm(note_curr.pitch) + off)
+            if abs(implied_thumb - anchor_curr) < 12.0:
+                cost += POSITION_ANCHOR_REWARD
 
         return cost
 
