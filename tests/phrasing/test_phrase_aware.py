@@ -132,8 +132,21 @@ class TestBoundaryScoreFusion:
         assert s.boundary_score() >= 0.30
 
     def test_rest_follows_adds_weight(self):
+        """rest_follows contributes weight but alone cannot trigger a boundary."""
         s = PhraseBoundarySignal(position=0, rest_follows=True, rest_duration=1.0)
-        assert s.boundary_score() >= 0.25
+        # Contributes 0.20, which is below the 0.40 threshold — by design
+        assert s.boundary_score() >= 0.15  # does contribute
+        assert s.boundary_score() < 0.40   # but not enough alone
+
+    def test_rest_plus_agogic_exceeds_threshold(self):
+        """rest + agogic_accent + cadence together should trigger a boundary."""
+        s = PhraseBoundarySignal(
+            position=0,
+            rest_follows=True, rest_duration=1.0,
+            agogic_accent=1.0,      # dotted whole note in context
+            cadence_strength=0.5,   # mild metric cue
+        )
+        assert s.boundary_score() >= 0.40
 
     def test_improvement2_downbeat_adds_weight(self):
         s_no = PhraseBoundarySignal(position=0, next_note_is_downbeat=False)
@@ -158,7 +171,8 @@ class TestBoundaryScoreFusion:
             slur_end=True, rest_follows=True, rest_duration=2.0,
             cadence_strength=1.0, large_interval=True,
             next_note_is_downbeat=True, phrase_length_prior=1.0,
-            dynamic_change=True,
+            dynamic_change=True, agogic_accent=1.0,
+            melodic_resolution=1.0, harmonic_cadence=1.0,
         )
         assert s.boundary_score() <= 1.0
 

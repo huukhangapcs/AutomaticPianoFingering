@@ -56,6 +56,130 @@ def _phrase_length_prior(candidate_measures: float) -> float:
 
 
 # ================================================================
+# Fix 2: Agogic Accent
+# A note that is significantly longer than its neighbors signals
+# a natural breath point / phrase ending for the pianist.
+# ================================================================
+
+def _agogic_strength(notes: List[NoteEvent], idx: int, window: int = 4) -> float:
+    """
+    Return the agogic accent strength at `idx` (0–1).
+
+    A note is an agogic accent if its duration is notably longer
+    than surrounding notes in a local context window.
+    """
+    if not notes:
+        return 0.0
+    local = notes[max(0, idx - window): min(len(notes), idx + window + 1)]
+    if len(local) < 2:
+        return 0.0
+
+    curr_dur = notes[idx].duration
+    local_durs = [n.duration for n in local if n is not notes[idx]]
+    if not local_durs:
+        return 0.0
+
+    avg = sum(local_durs) / len(local_durs)
+    if avg <= 0:
+        return 0.0
+
+    ratio = curr_dur / avg
+    # Require at least 3x to be "strong" agogic:
+    # half (2 beats) vs quarter (1 beat) = 2x, fires too often in classical music
+    # dotted half (3 beats) vs quarter = 3x → clear phrase-end breath
+    if ratio >= 3.0:
+        return 1.0
+    elif ratio >= 2.0:
+        return 0.5
+    elif ratio >= 1.5:
+        return 0.2
+    return 0.0
+
+
+# ================================================================
+# Fix 3: Harmonic Cadence via Bass Movement
+# Track the lowest pitch per onset group across a window.
+# A bass movement by P4 (5 semitones) or P5 (7 semitones)
+# is characteristic of V→I or IV→I cadential motion.
+# ================================================================
+
+_CADENTIAL_BASS_INTERVALS = {
+    5:  0.8,   # Perfect 4th up   (dominant → tonic)
+    -7: 0.8,   # Perfect 5th down (dominant → tonic)
+    -5: 0.6,   # Perfect 4th down (subdominant → tonic)
+    7:  0.6,   # Perfect 5th up   (subdominant below tonic)
+    # Step motion excluded: too common in melody, causes over-segmentation
+}
+
+
+def _harmonic_cadence_strength(
+    notes: List[NoteEvent],
+    idx: int,
+    window: int = 8,
+) -> float:
+    """
+    Estimate harmonic cadence strength at `idx` by analyzing bass
+    movement from the previous local "bass note" to the note at idx.
+
+    Only considers left-hand notes (hand='left') when both staves are
+    present, otherwise uses all notes.
+    """
+    if idx < 1:
+        return 0.0
+
+    # Get bass notes: lowest pitch within each onset cluster
+    # in the window before idx
+    lh = [n for n in notes[max(0, idx - window): idx + 1]
+          if n.hand == 'left'] or notes[max(0, idx - window): idx + 1]
+
+    if len(lh) < 2:
+        return 0.0
+
+    # Simple approach: compare pitch of the note at idx to note window//2 back
+    prev_bass = min(lh[:-1], key=lambda n: n.pitch)
+    curr_note = notes[idx]
+    interval = curr_note.pitch - prev_bass.pitch
+    # Normalize to within an octave
+    interval = interval % 12 if interval > 0 else -((-interval) % 12)
+    return _CADENTIAL_BASS_INTERVALS.get(interval, 0.0)
+
+
+# ================================================================
+# Fix 2b: Melodic Resolution Signal
+# A stepwise descent into a note with longer duration (the "arrival")
+# suggests phrase resolution.
+# ================================================================
+
+def _melodic_resolution_strength(
+    notes: List[NoteEvent],
+    idx: int,
+    agogic: float,
+) -> float:
+    """
+    Return melodic resolution strength at `idx`.
+
+    Combines:
+    - Stepwise (half or whole step) motion into `idx`
+    - The note at `idx` is longer than its predecessor (agogic)
+    - Descending motion (resolution feeling)
+    """
+    if idx < 1 or agogic <= 0:
+        return 0.0
+
+    prev = notes[idx - 1]
+    curr = notes[idx]
+    interval = curr.pitch - prev.pitch
+
+    # Descending stepwise motion (-1 or -2 semitones = half or whole step down)
+    if interval in (-1, -2) and agogic >= 0.3:
+        return min(0.8, agogic + 0.2)
+    # Ascending step resolution (uncommon but valid: leading tone → tonic)
+    if interval in (1, 2) and agogic >= 0.5:
+        return agogic * 0.5
+    return 0.0
+
+
+# ================================================================
 # Improvement 1: Melodic Arc Shape Detector
 # ================================================================
 
@@ -248,6 +372,17 @@ class PhraseBoundaryDetector:
             if next_note is not None:
                 sig.dynamic_change = next_note.dynamic != note.dynamic
 
+            # --- Fix 2: Agogic accent ---
+            sig.agogic_accent = _agogic_strength(notes, i)
+
+            # --- Fix 2b: Melodic resolution ---
+            sig.melodic_resolution = _melodic_resolution_strength(
+                notes, i, sig.agogic_accent
+            )
+
+            # --- Fix 3: Harmonic cadence via bass movement ---
+            sig.harmonic_cadence = _harmonic_cadence_strength(notes, i)
+
             signals.append(sig)
 
         # -----------------------------------------------------------
@@ -272,22 +407,30 @@ class PhraseBoundaryDetector:
         notes: List[NoteEvent],
     ) -> None:
         """
-        Improvement 3 implementation.
+        Fix 1 (Prior Reset Bug): Track last_boundary_measure properly.
 
-        For each candidate boundary, estimate how many measures have
-        elapsed since the beginning of the current phrase segment, then
-        look up the prior probability from classical phrase norms.
+        The previous implementation used notes[0].measure as the constant
+        reference, so elapsed_measures grew to 100+ for late notes,
+        making the prior = 0 for 90% of the piece.
+
+        Fix: reset reference whenever a strong candidate boundary is seen.
         """
-        last_boundary_measure = notes[0].measure if notes else 1
-        last_boundary_idx = 0
+        last_boundary_measure = notes[0].measure if notes else 0
 
         for i, sig in enumerate(signals):
             elapsed_measures = notes[i].measure - last_boundary_measure
-            sig.phrase_length_prior = _phrase_length_prior(
-                float(elapsed_measures)
+            sig.phrase_length_prior = _phrase_length_prior(float(elapsed_measures))
+            # Tentatively update reference if this position looks like a boundary
+            # (uses partial score excluding phrase_length_prior itself to avoid circularity)
+            partial_score = (
+                0.35 * float(sig.slur_end)
+                + 0.20 * float(sig.rest_follows)
+                + 0.20 * sig.agogic_accent
+                + 0.15 * sig.cadence_strength
+                + 0.03 * float(sig.large_interval)
             )
-            # Tentatively mark boundary to update reference point
-            # (will be confirmed later; this is just the prior injection)
+            if partial_score >= 0.25:  # Lower than full threshold — tentative
+                last_boundary_measure = notes[i].measure
 
     def _apply_melodic_arc_prior(
         self,

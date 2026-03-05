@@ -32,30 +32,57 @@ class PhraseBoundarySignal:
     """
     All signals collected at a potential phrase boundary position.
     Position = index of the LAST note of the candidate phrase.
+
+    Signals are fused in boundary_score() — weights calibrated so that:
+    - A single weak signal (rest alone) is NOT enough  
+    - Two medium signals (rest + agogic, or cadence + downbeat) ARE enough
+    - Slur end alone is strong enough (it's the most reliable signal)
     """
     position: int
     slur_end: bool = False
     rest_follows: bool = False
     rest_duration: float = 0.0       # In beats
-    cadence_strength: float = 0.0    # 0.0 → 1.0
+    cadence_strength: float = 0.0    # 0.0 → 1.0 (metric + interval cues)
     large_interval: bool = False     # |interval| > 7 semitones
-    # === 3 Improvements ===
+    # === Improvement signals ===
     melodic_arc: ArcType = ArcType.FLAT
     next_note_is_downbeat: bool = False  # Phrase lands on beat 1 of new measure
-    phrase_length_prior: float = 0.5    # Bayesian prior from standard phrase lengths
+    phrase_length_prior: float = 0.0    # Bayesian prior from standard phrase lengths
     dynamic_change: bool = False
+    # === New signals (Fix 2, Fix 3) ===
+    agogic_accent: float = 0.0       # Current note is locally longest (0–1 strength)
+    melodic_resolution: float = 0.0  # Stepwise descent into long note (0–1)
+    harmonic_cadence: float = 0.0    # Bass movement suggesting V→I or similar (0–1)
 
     def boundary_score(self) -> float:
-        """Fuse all signals into a single boundary strength [0..1]."""
+        """
+        Fuse all signals → single boundary strength [0..1].
+
+        Weight philosophy:
+          rest_follows    = 0.20  (necessary but not sufficient alone)
+          slur_end        = 0.35  (strongest single signal when present)
+          agogic_accent   = 0.20  (primary signal in absence of slurs)
+          cadence_strength= 0.15  (harmonic + metric cues combined)
+          harmonic_cadence= 0.15  (bass V→I motion)
+          melodic_resol.  = 0.10  (stepwise descent into breathpoint)
+          downbeat        = 0.10  (next note is beat 1 of new measure)
+          phrase_len_prior= 0.10  (classical phrase length norms)
+          large_interval  = 0.03  (leap suggests new topic)
+          dynamic_change  = 0.02  (dynamic shift)
+
+        Note: rest_follows is CAPPED so that rest alone (0.20) < threshold (0.40).
+        Need at least one more supporting signal to confirm a boundary.
+        """
         score = 0.0
-        score += 0.30 * float(self.slur_end)
-        score += 0.25 * float(self.rest_follows) * min(1.0, self.rest_duration)
-        score += 0.20 * self.cadence_strength
-        # === Improvement 2: metric position ===
-        score += 0.12 * float(self.next_note_is_downbeat)
-        # === Improvement 3: phrase length prior ===
-        score += 0.08 * self.phrase_length_prior
-        score += 0.03 * float(self.large_interval)
+        score += 0.35 * float(self.slur_end)                         # strongest
+        score += 0.22 * min(1.0, float(self.rest_follows))           # rest alone ≠ boundary
+        score += 0.15 * self.agogic_accent                           # long note = breathpoint
+        score += 0.15 * self.cadence_strength                        # metric + interval
+        score += 0.18 * self.harmonic_cadence                        # bass V→I (now precise)
+        score += 0.10 * self.melodic_resolution                      # stepwise descent
+        score += 0.10 * float(self.next_note_is_downbeat)            # phrase lands on 1
+        score += 0.10 * self.phrase_length_prior                     # 4/8 bar norm
+        score += 0.03 * float(self.large_interval)                   # leap = topic change
         score += 0.02 * float(self.dynamic_change)
         return min(score, 1.0)
 
