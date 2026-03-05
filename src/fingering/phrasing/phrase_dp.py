@@ -49,6 +49,19 @@ OFOK_PENALTY        = 12.0   # Same finger, different pitch (legato break)
 DIRECTION_REWARD    = -1.8   # Natural finger order alignment (strengthened from -1.0)
 REPEATED_THUMB_PENALTY = 6.0 # Rapid thumb reuse: thumb appearing after only 1-2 intervening fingers
 
+# ── Short-step crossing penalty ─────────────────────────────────────────
+# Thumb-under cho half/whole step (E→F, C→D, ’) là lãng phí — pianist
+# dùng 1→2→3 thẳng, không cần crossing. Chỉ reward crossing khi interval
+# ≥ 3 semitones (minor 3rd) — đó là lúc thumb-under cần thiết (ví dụ: scale C major
+# có 3→1 tại E→F bằng 1 semitone — thực ra scale chuyn sang 1 ở F!).
+# Điều này fix lỗi: E5→F5→G5 = 2→1→3 (sai) → 1→2→3 (đúng).
+SHORT_STEP_CROSSING_PENALTY = 2.5  # Penalty cho crossing không cần thiết (interval 1-2 semitones)
+
+# ── Sequential stepwise reward ─────────────────────────────────────────
+# Khi di chuyển stepwise (1-2 semitones) mà ngón tăng đều (1→2, 2→3, 3→4)
+# thì không cần di chuyển bàn tay. Đây là fingering tự nhiên nhất.
+SEQUENTIAL_STEPWISE_REWARD = -2.0  # Reward mạnh cho liền-bậc-liền-ngón
+
 # ── Phase 4: OFF_BY_ONE fix ──────────────────────────────────────────────
 # Bias correction: DP systematically under-estimates finger number.
 # 67.8% of OFF_BY_ONE cases are GT > Pred (predicted too LOW).
@@ -204,9 +217,10 @@ class PhraseScopedDP:
         # reserving thumb for pivot/crossing situations.
         # MIDI 65+ (F4 and above) is "mid-high" register for RH.
         # Penalise using thumb or index when not in a scale/forced context.
-        # This gently pushes the DP away from the systematic "too-low" bias.
+        # Exception: CLIMB/ARCH arc → thumb as anchor for 1→2→3 is natural.
         is_mid_high = note.pitch >= 65    # F4 and above = mid-high register
-        if is_mid_high and finger == 1:
+        is_ascending_phrase = phrase.arc_type.name in ('CLIMB', 'ARCH')
+        if is_mid_high and finger == 1 and not is_ascending_phrase:
             # Thumb on F4+ = likely part of a crossing, but if not forced:
             cost += REGISTER_MISMATCH_COST
         return cost
@@ -268,6 +282,17 @@ class PhraseScopedDP:
         pair = (min(f_prev, f_curr), max(f_prev, f_curr))
         if pair in {(3, 4), (4, 5), (3, 5)}:
             cost += WEAK_PAIR_PENALTY
+
+        # Nguyên tắc 2: Di chuyển ít nhất có thể ─────────────────────────────────
+        # Khi note liền bậc (semitone 1-2), nếu ngón cũng tăng đều (f+1 khi ascending
+        # hoặc f-1 khi descending), reward mạnh — bàn tay không cần dịchển.
+        # Fix: E5→F5(1 semitone) bằng f+1 = đúng hơn là thumb crossing.
+        semitone_step = abs(note_curr.pitch - note_prev.pitch)
+        if semitone_step <= 2:
+            if ascending and f_curr == f_prev + 1:
+                cost += SEQUENTIAL_STEPWISE_REWARD  # 1→2, 2→3, 3→4 ascending
+            elif not ascending and f_curr == f_prev - 1:
+                cost += SEQUENTIAL_STEPWISE_REWARD  # 3→2, 2→1 descending
 
         # Nguyên tắc 5: soft penalty khi landing trên ngón 4
         # (không áp dụng khi ngón 4 là một phần của weak pair đã penalize)
@@ -331,17 +356,21 @@ class PhraseScopedDP:
                 cost += CROSSING_STANDARD + 4.0
             elif is_thumb_under:
                 cost += CROSSING_THUMB_UNDER
-                # Bonus reward when this thumb-under aligns with scale motion
-                # (Note lands on white key and is part of a stepwise passage)
+                # Thumb-under reward cần interval ≥ 3 semitones:
+                # Với 1-2 semitones (half/whole step), crossing là lãng phí —
+                # sequential fingering (1→2→3) hiệu quả hơn.
                 semitone = abs(note_curr.pitch - note_prev.pitch)
-                if not note_curr.is_black and semitone <= 4:
-                    cost += THUMB_UNDER_REWARD   # negative = reward!  
+                if not note_curr.is_black and 3 <= semitone <= 6:
+                    cost += THUMB_UNDER_REWARD   # reward! (≤ 4 quá hào phóng)
+                elif semitone <= 2:
+                    cost += SHORT_STEP_CROSSING_PENALTY  # Discourage needless crossing
             elif is_finger_over:
                 cost += CROSSING_THUMB_UNDER
-                # Bonus reward for correct finger-over in descending/ascending context
                 semitone = abs(note_curr.pitch - note_prev.pitch)
-                if not note_curr.is_black and semitone <= 4:
-                    cost += FINGER_OVER_REWARD   # negative = reward!
+                if not note_curr.is_black and 3 <= semitone <= 6:
+                    cost += FINGER_OVER_REWARD   # reward!
+                elif semitone <= 2:
+                    cost += SHORT_STEP_CROSSING_PENALTY  # Discourage needless crossing
             elif thumb_crossing_natural(f_prev, f_curr, ascending, hand):
                 cost += CROSSING_THUMB_UNDER  # Standard scale thumb motion
             else:
@@ -389,7 +418,7 @@ class PhraseScopedDP:
             if misaligned and not thumb_crossing_natural(f_prev, f_curr, ascending, note_curr.hand):
                 cost += ARC_MISALIGN_PENALTY * tension
 
-        return max(cost, 0.0)
+        return cost
 
     def _best_single_finger(self, note: NoteEvent, phrase: Phrase) -> int:
         """Heuristic for single-note phrases."""

@@ -259,7 +259,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>1</fingering></technical>
           </notations>
         </note>
       <note default-x="109.69" default-y="0.00">
@@ -275,7 +275,7 @@
         <beam number="1">begin</beam>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <note default-x="135.48" default-y="5.00">
@@ -330,7 +330,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>1</fingering></technical>
           </notations>
         </note>
       <note default-x="110.65" default-y="0.00">
@@ -346,7 +346,7 @@
         <beam number="1">begin</beam>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <note default-x="136.44" default-y="5.00">
@@ -362,7 +362,7 @@
         <beam number="1">end</beam>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -459,7 +459,7 @@
         <beam number="1">end</beam>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -773,7 +773,7 @@
         <beam number="1">begin</beam>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="114.20" default-y="-10.00">
@@ -789,7 +789,7 @@
         <beam number="1">end</beam>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <note default-x="138.90" default-y="-15.00">
@@ -804,7 +804,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>1</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -862,7 +862,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <note default-x="51.02" default-y="-15.00">
@@ -878,7 +878,7 @@
         <beam number="1">begin</beam>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>1</fingering></technical>
           </notations>
         </note>
       <note default-x="75.72" default-y="-10.00">
@@ -896,7 +896,7 @@
         <notations>
           <tied type="start" />
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <note default-x="100.43" default-y="-10.00">
@@ -1054,7 +1054,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>1</fingering></technical>
           </notations>
         </note>
       <note default-x="167.20" default-y="0.00">
@@ -1070,7 +1070,7 @@
         <beam number="1">begin</beam>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <note default-x="191.35" default-y="5.00">
@@ -1105,7 +1105,7 @@
         <staff>2</staff>
         <notations>
           <tied type="stop" />
-          <technical><fingering>2</fingering></technical></notations>
+          <technical><fingering>3</fingering></technical></notations>
         </note>
       <note default-x="85.02" default-y="-83.13">
         <pitch>
@@ -1118,7 +1118,7 @@
         <dot />
         <stem>down</stem>
         <staff>2</staff>
-        <notations><technical><fingering>1</fingering></technical></notations></note>
+        <notations><technical><fingering>2</fingering></technical></notations></note>
       <note default-x="130.96" default-y="-98.13">
         <rest />
         <duration>4</duration>
@@ -1153,7 +1153,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>1</fingering></technical>
           </notations>
         </note>
       <note default-x="104.56" default-y="0.00">
@@ -1169,7 +1169,7 @@
         <beam number="1">begin</beam>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <note default-x="128.72" default-y="5.00">
@@ -1185,7 +1185,7 @@
         <beam number="1">end</beam>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -1282,7 +1282,7 @@
         <beam number="1">end</beam>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -1700,7 +1700,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="127.23" default-y="-10.00">
@@ -1821,7 +1821,7 @@
         <beam number="1">begin</beam>
         <notations>
           <technical>
-            <fingering>4</fingering></technical>
+            <fingering>5</fingering></technical>
           </notations>
         </note>
       <note default-x="69.27" default-y="-88.13">
@@ -1839,7 +1839,7 @@
         <notations>
           <tied type="start" />
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <note default-x="91.40" default-y="-88.13">
@@ -1855,7 +1855,7 @@
         <staff>2</staff>
         <notations>
           <tied type="stop" />
-          <technical><fingering>2</fingering></technical></notations>
+          <technical><fingering>1</fingering></technical></notations>
         </note>
       <note default-x="124.59" default-y="-83.13">
         <pitch>
@@ -1869,7 +1869,7 @@
         <staff>2</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       </measure>
@@ -2040,7 +2040,7 @@
         <type>half</type>
         <stem>down</stem>
         <staff>2</staff>
-        <notations><technical><fingering>2</fingering></technical></notations></note>
+        <notations><technical><fingering>1</fingering></technical></notations></note>
       </measure>
     <measure number="25" width="147.55">
       <note default-x="13.00" default-y="-5.00">
@@ -2091,7 +2091,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="112.56" default-y="-20.00">
@@ -2106,7 +2106,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -2124,7 +2124,7 @@
         <staff>2</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <note default-x="79.38" default-y="-83.13">
@@ -2137,7 +2137,7 @@
         <type>half</type>
         <stem>down</stem>
         <staff>2</staff>
-        <notations><technical><fingering>1</fingering></technical></notations></note>
+        <notations><technical><fingering>3</fingering></technical></notations></note>
       </measure>
     <measure number="26" width="130.96">
       <harmony print-frame="no">
@@ -2158,7 +2158,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>1</fingering></technical>
           </notations>
         </note>
       <note default-x="46.19" default-y="-15.00">
@@ -2173,7 +2173,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <note default-x="79.38" default-y="-15.00">
@@ -2188,7 +2188,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>1</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -2204,7 +2204,7 @@
         <type>half</type>
         <stem>down</stem>
         <staff>2</staff>
-        <notations><technical><fingering>2</fingering></technical></notations></note>
+        <notations><technical><fingering>1</fingering></technical></notations></note>
       <note default-x="79.38" default-y="-78.13">
         <pitch>
           <step>A</step>
@@ -2215,7 +2215,7 @@
         <type>half</type>
         <stem>down</stem>
         <staff>2</staff>
-        <notations><technical><fingering>1</fingering></technical></notations></note>
+        <notations><technical><fingering>2</fingering></technical></notations></note>
       </measure>
     <measure number="27" width="140.21">
       <harmony print-frame="no">
@@ -2244,7 +2244,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="104.85" default-y="-30.00">
@@ -2277,7 +2277,7 @@
         <staff>2</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>5</fingering></technical>
           </notations>
         </note>
       <note default-x="62.78" default-y="-93.13">
@@ -2387,7 +2387,7 @@
         <type>half</type>
         <stem>down</stem>
         <staff>2</staff>
-        <notations><technical><fingering>2</fingering></technical></notations></note>
+        <notations><technical><fingering>1</fingering></technical></notations></note>
       </measure>
     <measure number="29" width="139.35">
       <harmony print-frame="no">
@@ -2438,7 +2438,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="106.41" default-y="-20.00">
@@ -2453,7 +2453,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -2469,7 +2469,7 @@
         <type>half</type>
         <stem>down</stem>
         <staff>2</staff>
-        <notations><technical><fingering>1</fingering></technical></notations></note>
+        <notations><technical><fingering>2</fingering></technical></notations></note>
       <note default-x="75.27" default-y="-83.13">
         <pitch>
           <step>G</step>
@@ -2480,7 +2480,7 @@
         <type>half</type>
         <stem>down</stem>
         <staff>2</staff>
-        <notations><technical><fingering>1</fingering></technical></notations></note>
+        <notations><technical><fingering>3</fingering></technical></notations></note>
       </measure>
     <measure number="30" width="123.78">
       <harmony print-frame="no">
@@ -2501,7 +2501,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>1</fingering></technical>
           </notations>
         </note>
       <note default-x="44.14" default-y="-15.00">
@@ -2516,7 +2516,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <note default-x="75.27" default-y="-15.00">
@@ -2547,7 +2547,7 @@
         <type>half</type>
         <stem>down</stem>
         <staff>2</staff>
-        <notations><technical><fingering>2</fingering></technical></notations></note>
+        <notations><technical><fingering>1</fingering></technical></notations></note>
       <note default-x="75.27" default-y="-93.13">
         <pitch>
           <step>E</step>
@@ -2622,7 +2622,7 @@
         <type>half</type>
         <stem>down</stem>
         <staff>2</staff>
-        <notations><technical><fingering>1</fingering></technical></notations></note>
+        <notations><technical><fingering>2</fingering></technical></notations></note>
       </measure>
     <measure number="32" width="109.17">
       <harmony print-frame="no">
@@ -2660,7 +2660,7 @@
         <staff>2</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="13.96" default-y="-78.13">
@@ -2723,7 +2723,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="83.06" default-y="-20.00">
@@ -2738,7 +2738,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -2818,7 +2818,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>1</fingering></technical>
           </notations>
         </note>
       <note default-x="44.14" default-y="-15.00">
@@ -2833,7 +2833,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <note default-x="75.27" default-y="-10.00">
@@ -2848,7 +2848,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="106.41" default-y="-30.00">
@@ -3061,7 +3061,7 @@
         <beam number="1">begin</beam>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="118.29" default-y="-5.00">
@@ -3180,7 +3180,7 @@
         <beam number="1">begin</beam>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="70.43" default-y="-10.00">
@@ -3572,7 +3572,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="116.38" default-y="-20.00">
@@ -3587,7 +3587,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -3646,7 +3646,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>1</fingering></technical>
           </notations>
         </note>
       <note default-x="47.46" default-y="-15.00">
@@ -3661,7 +3661,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <note default-x="81.92" default-y="-15.00">
@@ -3676,7 +3676,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>1</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -3743,7 +3743,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="170.94" default-y="-30.00">
@@ -3951,7 +3951,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="114.06" default-y="-20.00">
@@ -3966,7 +3966,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -4025,7 +4025,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>1</fingering></technical>
           </notations>
         </note>
       <note default-x="46.69" default-y="-15.00">
@@ -4040,7 +4040,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <note default-x="80.37" default-y="-15.00">
@@ -4055,7 +4055,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>3</fingering></technical>
+            <fingering>1</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -4248,7 +4248,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="105.64" default-y="-20.00">
@@ -4263,7 +4263,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -4322,7 +4322,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>1</fingering></technical>
           </notations>
         </note>
       <note default-x="92.62" default-y="-15.00">
@@ -4337,7 +4337,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <note default-x="124.37" default-y="-10.00">
@@ -4352,7 +4352,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="156.13" default-y="-30.00">
@@ -4523,7 +4523,7 @@
         <beam number="1">begin</beam>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="65.93" default-y="-5.00">
@@ -4541,7 +4541,7 @@
         <notations>
           <tied type="start" />
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="87.10" default-y="-5.00">
@@ -4625,7 +4625,7 @@
         <beam number="1">begin</beam>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="65.93" default-y="-10.00">
@@ -4643,7 +4643,7 @@
         <notations>
           <tied type="start" />
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <harmony print-frame="no">
@@ -4665,7 +4665,7 @@
         <staff>1</staff>
         <notations>
           <tied type="stop" />
-          <technical><fingering>2</fingering></technical></notations>
+          <technical><fingering>1</fingering></technical></notations>
         </note>
       <note default-x="118.85" default-y="-15.00">
         <pitch>
@@ -4679,7 +4679,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -4805,7 +4805,7 @@
         <staff>2</staff>
         <notations>
           <tied type="stop" />
-          <technical><fingering>2</fingering></technical></notations>
+          <technical><fingering>5</fingering></technical></notations>
         </note>
       <note default-x="120.74" default-y="-58.53">
         <pitch>
@@ -4819,7 +4819,7 @@
         <staff>2</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       </measure>
@@ -4843,7 +4843,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>1</fingering></technical>
           </notations>
         </note>
       <note default-x="93.35" default-y="0.00">
@@ -4859,7 +4859,7 @@
         <beam number="1">begin</beam>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <note default-x="114.52" default-y="5.00">
@@ -4875,7 +4875,7 @@
         <beam number="1">end</beam>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -4892,7 +4892,7 @@
         <staff>2</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>1</fingering></technical>
           </notations>
         </note>
       </measure>
@@ -4954,7 +4954,7 @@
         <beam number="1">end</beam>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -4972,7 +4972,7 @@
         <staff>2</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>4</fingering></technical>
           </notations>
         </note>
       <note default-x="60.63" default-y="-83.53">
@@ -5033,7 +5033,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>1</fingering></technical>
           </notations>
         </note>
       <note default-x="152.05" default-y="0.00">
@@ -5049,7 +5049,7 @@
         <beam number="1">begin</beam>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <note default-x="176.37" default-y="5.00">
@@ -5715,7 +5715,7 @@
         <beam number="1">end</beam>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -5758,7 +5758,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>1</fingering></technical>
           </notations>
         </note>
       <note default-x="106.03" default-y="0.00">
@@ -5774,7 +5774,7 @@
         <beam number="1">begin</beam>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <note default-x="130.84" default-y="5.00">
@@ -5790,7 +5790,7 @@
         <beam number="1">end</beam>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -5889,7 +5889,7 @@
         <beam number="1">end</beam>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -6315,7 +6315,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="126.70" default-y="-10.00">
@@ -6404,7 +6404,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -6422,7 +6422,7 @@
         <staff>2</staff>
         <notations>
           <technical>
-            <fingering>3</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <note default-x="46.88" default-y="-108.53">
@@ -6438,7 +6438,7 @@
         <beam number="1">begin</beam>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>5</fingering></technical>
           </notations>
         </note>
       <note default-x="68.83" default-y="-93.53">
@@ -6472,7 +6472,7 @@
         <staff>2</staff>
         <notations>
           <tied type="stop" />
-          <technical><fingering>2</fingering></technical></notations>
+          <technical><fingering>1</fingering></technical></notations>
         </note>
       <note default-x="123.70" default-y="-88.53">
         <pitch>
@@ -6486,7 +6486,7 @@
         <staff>2</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       </measure>
@@ -6557,7 +6557,7 @@
         <staff>2</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="13.00" default-y="-98.53">
@@ -6666,7 +6666,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="103.53" default-y="-10.00">
@@ -6681,7 +6681,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -6714,7 +6714,7 @@
         <staff>2</staff>
         <notations>
           <technical>
-            <fingering>4</fingering></technical>
+            <fingering>5</fingering></technical>
           </notations>
         </note>
       <note default-x="78.84" default-y="-88.53">
@@ -6782,7 +6782,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="111.76" default-y="-5.00">
@@ -6920,7 +6920,7 @@
         <type>quarter</type>
         <stem>up</stem>
         <staff>2</staff>
-        <notations><technical><fingering>4</fingering></technical></notations></note>
+        <notations><technical><fingering>5</fingering></technical></notations></note>
       <note default-x="78.84" default-y="-98.53">
         <pitch>
           <step>E</step>
@@ -7023,7 +7023,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="95.06" default-y="-20.00">
@@ -7038,7 +7038,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -7071,7 +7071,7 @@
         <staff>2</staff>
         <notations>
           <technical>
-            <fingering>4</fingering></technical>
+            <fingering>5</fingering></technical>
           </notations>
         </note>
       <note default-x="72.68" default-y="-88.53">
@@ -7109,7 +7109,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>1</fingering></technical>
           </notations>
         </note>
       <note default-x="42.84" default-y="-15.00">
@@ -7124,7 +7124,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="72.68" default-y="-15.00">
@@ -7139,7 +7139,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -7359,7 +7359,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="95.06" default-y="-10.00">
@@ -7374,7 +7374,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -7407,7 +7407,7 @@
         <staff>2</staff>
         <notations>
           <technical>
-            <fingering>4</fingering></technical>
+            <fingering>5</fingering></technical>
           </notations>
         </note>
       <note default-x="72.68" default-y="-88.53">
@@ -7475,7 +7475,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="102.52" default-y="-5.00">
@@ -7613,7 +7613,7 @@
         <type>quarter</type>
         <stem>up</stem>
         <staff>2</staff>
-        <notations><technical><fingering>4</fingering></technical></notations></note>
+        <notations><technical><fingering>5</fingering></technical></notations></note>
       <note default-x="72.68" default-y="-98.53">
         <pitch>
           <step>E</step>
@@ -7764,7 +7764,7 @@
         <staff>2</staff>
         <notations>
           <technical>
-            <fingering>4</fingering></technical>
+            <fingering>5</fingering></technical>
           </notations>
         </note>
       <note default-x="79.49" default-y="-88.53">
@@ -7989,7 +7989,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>1</fingering></technical>
           </notations>
         </note>
       <note default-x="97.08" default-y="0.00">
@@ -8005,7 +8005,7 @@
         <beam number="1">begin</beam>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <note default-x="119.24" default-y="5.00">
@@ -8021,7 +8021,7 @@
         <beam number="1">end</beam>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -8118,7 +8118,7 @@
         <beam number="1">end</beam>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -8214,7 +8214,7 @@
         <beam number="1">begin</beam>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="135.86" default-y="5.00">
@@ -8230,7 +8230,7 @@
         <beam number="1">end</beam>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -8691,7 +8691,7 @@
         <staff>2</staff>
         <notations>
           <tied type="stop" />
-          <technical><fingering>2</fingering></technical></notations>
+          <technical><fingering>5</fingering></technical></notations>
         </note>
       <note default-x="127.91" default-y="-58.53">
         <pitch>
@@ -8705,7 +8705,7 @@
         <staff>2</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       </measure>
@@ -8731,7 +8731,7 @@
         <staff>2</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>1</fingering></technical>
           </notations>
         </note>
       </measure>
@@ -9102,7 +9102,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>1</fingering></technical>
           </notations>
         </note>
       <note default-x="106.42" default-y="0.00">
@@ -9118,7 +9118,7 @@
         <beam number="1">begin</beam>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <note default-x="131.08" default-y="5.00">
@@ -9134,7 +9134,7 @@
         <beam number="1">end</beam>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -9231,7 +9231,7 @@
         <beam number="1">end</beam>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -9327,7 +9327,7 @@
         <beam number="1">begin</beam>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="149.57" default-y="5.00">
@@ -9343,7 +9343,7 @@
         <beam number="1">end</beam>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -9699,7 +9699,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -9756,7 +9756,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -9789,7 +9789,7 @@
         <dot />
         <stem>down</stem>
         <staff>2</staff>
-        <notations><technical><fingering>2</fingering></technical></notations></note>
+        <notations><technical><fingering>1</fingering></technical></notations></note>
       <note default-x="109.90" default-y="-98.53">
         <pitch>
           <step>E</step>
@@ -9803,7 +9803,7 @@
         <staff>2</staff>
         <notations>
           <tied type="start" />
-          <technical><fingering>1</fingering></technical></notations>
+          <technical><fingering>2</fingering></technical></notations>
         </note>
       </measure>
     <measure number="119" width="179.06">
@@ -9858,7 +9858,7 @@
         <beam number="1">end</beam>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -9877,7 +9877,7 @@
         <staff>2</staff>
         <notations>
           <tied type="stop" />
-          <technical><fingering>1</fingering></technical></notations>
+          <technical><fingering>3</fingering></technical></notations>
         </note>
       <note default-x="38.23" default-y="-88.53">
         <pitch>
@@ -9925,7 +9925,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>1</fingering></technical>
           </notations>
         </note>
       <note default-x="108.56" default-y="0.00">
@@ -9941,7 +9941,7 @@
         <beam number="1">begin</beam>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <note default-x="133.79" default-y="5.00">
@@ -9957,7 +9957,7 @@
         <beam number="1">end</beam>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -10061,7 +10061,7 @@
         <beam number="1">end</beam>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -10157,7 +10157,7 @@
         <beam number="1">begin</beam>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="152.71" default-y="5.00">
@@ -10173,7 +10173,7 @@
         <beam number="1">end</beam>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -10479,7 +10479,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="77.75" default-y="-10.00">
@@ -10566,7 +10566,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -10600,7 +10600,7 @@
         <beam number="1">begin</beam>
         <notations>
           <technical>
-            <fingering>4</fingering></technical>
+            <fingering>5</fingering></technical>
           </notations>
         </note>
       <note default-x="67.11" default-y="-93.53">
@@ -10618,7 +10618,7 @@
         <notations>
           <tied type="start" />
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <note default-x="88.38" default-y="-93.53">
@@ -10634,7 +10634,7 @@
         <staff>2</staff>
         <notations>
           <tied type="stop" />
-          <technical><fingering>2</fingering></technical></notations>
+          <technical><fingering>1</fingering></technical></notations>
         </note>
       <note default-x="120.27" default-y="-88.53">
         <pitch>
@@ -10648,7 +10648,7 @@
         <staff>2</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       </measure>
@@ -10719,7 +10719,7 @@
         <staff>2</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="13.00" default-y="-98.53">
@@ -10828,7 +10828,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="100.70" default-y="-10.00">
@@ -10843,7 +10843,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -10876,7 +10876,7 @@
         <staff>2</staff>
         <notations>
           <technical>
-            <fingering>4</fingering></technical>
+            <fingering>5</fingering></technical>
           </notations>
         </note>
       <note default-x="76.78" default-y="-88.53">
@@ -10944,7 +10944,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="150.28" default-y="-5.00">
@@ -11082,7 +11082,7 @@
         <type>quarter</type>
         <stem>up</stem>
         <staff>2</staff>
-        <notations><technical><fingering>4</fingering></technical></notations></note>
+        <notations><technical><fingering>5</fingering></technical></notations></note>
       <note default-x="72.62" default-y="-98.53">
         <pitch>
           <step>E</step>
@@ -11185,7 +11185,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="94.97" default-y="-20.00">
@@ -11200,7 +11200,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -11233,7 +11233,7 @@
         <staff>2</staff>
         <notations>
           <technical>
-            <fingering>4</fingering></technical>
+            <fingering>5</fingering></technical>
           </notations>
         </note>
       <note default-x="72.62" default-y="-88.53">
@@ -11271,7 +11271,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>1</fingering></technical>
           </notations>
         </note>
       <note default-x="42.81" default-y="-15.00">
@@ -11286,7 +11286,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="72.62" default-y="-15.00">
@@ -11301,7 +11301,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -11521,7 +11521,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="94.97" default-y="-10.00">
@@ -11536,7 +11536,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -11569,7 +11569,7 @@
         <staff>2</staff>
         <notations>
           <technical>
-            <fingering>4</fingering></technical>
+            <fingering>5</fingering></technical>
           </notations>
         </note>
       <note default-x="72.62" default-y="-88.53">
@@ -11637,7 +11637,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="163.34" default-y="-5.00">
@@ -11775,7 +11775,7 @@
         <type>quarter</type>
         <stem>up</stem>
         <staff>2</staff>
-        <notations><technical><fingering>4</fingering></technical></notations></note>
+        <notations><technical><fingering>5</fingering></technical></notations></note>
       <note default-x="81.32" default-y="-98.53">
         <pitch>
           <step>E</step>
@@ -11878,7 +11878,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="106.94" default-y="-20.00">
@@ -11893,7 +11893,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -11926,7 +11926,7 @@
         <staff>2</staff>
         <notations>
           <technical>
-            <fingering>4</fingering></technical>
+            <fingering>5</fingering></technical>
           </notations>
         </note>
       <note default-x="81.32" default-y="-88.53">
@@ -11964,7 +11964,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>1</fingering></technical>
           </notations>
         </note>
       <note default-x="47.16" default-y="-15.00">
@@ -11979,7 +11979,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <note default-x="81.32" default-y="-15.00">
@@ -12174,7 +12174,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>4</fingering></technical>
+            <fingering>5</fingering></technical>
           </notations>
         </note>
       <note default-x="99.36" default-y="-25.00">
@@ -12328,7 +12328,7 @@
         <voice>5</voice>
         <type>whole</type>
         <staff>2</staff>
-        <notations><technical><fingering>1</fingering></technical></notations></note>
+        <notations><technical><fingering>2</fingering></technical></notations></note>
       </measure>
     <measure number="147" width="157.66">
       <harmony print-frame="no">
@@ -12426,7 +12426,7 @@
         <voice>5</voice>
         <type>whole</type>
         <staff>2</staff>
-        <notations><technical><fingering>2</fingering></technical></notations></note>
+        <notations><technical><fingering>1</fingering></technical></notations></note>
       </measure>
     <measure number="148" width="130.38">
       <harmony print-frame="no">
@@ -12462,7 +12462,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>4</fingering></technical>
+            <fingering>5</fingering></technical>
           </notations>
         </note>
       <note default-x="95.83" default-y="-25.00">
@@ -12492,7 +12492,7 @@
         <voice>5</voice>
         <type>whole</type>
         <staff>2</staff>
-        <notations><technical><fingering>4</fingering></technical></notations></note>
+        <notations><technical><fingering>2</fingering></technical></notations></note>
       </measure>
     <measure number="149" width="148.02">
       <harmony print-frame="no">
@@ -12565,7 +12565,7 @@
         <voice>5</voice>
         <type>whole</type>
         <staff>2</staff>
-        <notations><technical><fingering>2</fingering></technical></notations></note>
+        <notations><technical><fingering>5</fingering></technical></notations></note>
       </measure>
     <measure number="150" width="114.00">
       <harmony print-frame="no">
@@ -12616,7 +12616,7 @@
         <voice>5</voice>
         <type>whole</type>
         <staff>2</staff>
-        <notations><technical><fingering>1</fingering></technical></notations></note>
+        <notations><technical><fingering>2</fingering></technical></notations></note>
       </measure>
     <measure number="151" width="114.00">
       <note default-x="13.96" default-y="-10.00">
@@ -12661,7 +12661,7 @@
         <voice>5</voice>
         <type>whole</type>
         <staff>2</staff>
-        <notations><technical><fingering>2</fingering></technical></notations></note>
+        <notations><technical><fingering>1</fingering></technical></notations></note>
       </measure>
     <measure number="152" width="89.44">
       <harmony print-frame="no">
@@ -12696,7 +12696,7 @@
         <voice>5</voice>
         <type>whole</type>
         <staff>2</staff>
-        <notations><technical><fingering>1</fingering></technical></notations></note>
+        <notations><technical><fingering>2</fingering></technical></notations></note>
       </measure>
     <measure number="153" width="174.00">
       <harmony print-frame="no">
@@ -12754,7 +12754,7 @@
         <voice>5</voice>
         <type>whole</type>
         <staff>2</staff>
-        <notations><technical><fingering>2</fingering></technical></notations></note>
+        <notations><technical><fingering>3</fingering></technical></notations></note>
       </measure>
     <measure number="154" width="111.20">
       <harmony print-frame="no">
@@ -12805,7 +12805,7 @@
         <voice>5</voice>
         <type>whole</type>
         <staff>2</staff>
-        <notations><technical><fingering>1</fingering></technical></notations></note>
+        <notations><technical><fingering>2</fingering></technical></notations></note>
       </measure>
     <measure number="155" width="143.01">
       <harmony print-frame="no">
@@ -12833,7 +12833,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="77.58" default-y="-5.00">
@@ -12878,7 +12878,7 @@
         <voice>5</voice>
         <type>whole</type>
         <staff>2</staff>
-        <notations><technical><fingering>2</fingering></technical></notations></note>
+        <notations><technical><fingering>1</fingering></technical></notations></note>
       </measure>
     <measure number="156" width="171.00">
       <harmony print-frame="no">
@@ -12931,7 +12931,7 @@
         <beam number="1">end</beam>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <note default-x="88.19" default-y="-20.00">
@@ -12960,7 +12960,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>1</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -12975,7 +12975,7 @@
         <voice>5</voice>
         <type>whole</type>
         <staff>2</staff>
-        <notations><technical><fingering>4</fingering></technical></notations></note>
+        <notations><technical><fingering>2</fingering></technical></notations></note>
       </measure>
     <measure number="157" width="164.22">
       <note default-x="13.96" default-y="-10.00">
@@ -12990,7 +12990,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="45.77" default-y="-10.00">
@@ -13006,7 +13006,7 @@
         <beam number="1">begin</beam>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <note default-x="66.98" default-y="-10.00">
@@ -13022,7 +13022,7 @@
         <beam number="1">end</beam>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>1</fingering></technical>
           </notations>
         </note>
       <harmony print-frame="no">
@@ -13050,7 +13050,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="130.60" default-y="-15.00">
@@ -13065,7 +13065,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -13168,7 +13168,7 @@
         <staff>2</staff>
         <notations>
           <tied type="stop" />
-          <technical><fingering>2</fingering></technical></notations>
+          <technical><fingering>5</fingering></technical></notations>
         </note>
       <note default-x="120.89" default-y="-58.53">
         <pitch>
@@ -13182,7 +13182,7 @@
         <staff>2</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       </measure>
@@ -13247,7 +13247,7 @@
         <staff>2</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>1</fingering></technical>
           </notations>
         </note>
       </measure>
@@ -13275,7 +13275,7 @@
         <type>quarter</type>
         <stem>down</stem>
         <staff>1</staff>
-        <notations><technical><fingering>2</fingering></technical></notations></note>
+        <notations><technical><fingering>1</fingering></technical></notations></note>
       <note default-x="152.43" default-y="0.00">
         <pitch>
           <step>F</step>
@@ -13287,7 +13287,7 @@
         <stem>down</stem>
         <staff>1</staff>
         <beam number="1">begin</beam>
-        <notations><technical><fingering>1</fingering></technical></notations></note>
+        <notations><technical><fingering>2</fingering></technical></notations></note>
       <note default-x="176.85" default-y="5.00">
         <pitch>
           <step>G</step>
@@ -13299,7 +13299,7 @@
         <stem>down</stem>
         <staff>1</staff>
         <beam number="1">end</beam>
-        <notations><technical><fingering>2</fingering></technical></notations></note>
+        <notations><technical><fingering>3</fingering></technical></notations></note>
       <backup>
         <duration>8</duration>
         </backup>
@@ -13313,7 +13313,7 @@
         <type>half</type>
         <stem>down</stem>
         <staff>2</staff>
-        <notations><technical><fingering>2</fingering></technical></notations></note>
+        <notations><technical><fingering>4</fingering></technical></notations></note>
       <note default-x="115.80" default-y="-83.53">
         <pitch>
           <step>A</step>
@@ -13386,7 +13386,7 @@
         <stem>down</stem>
         <staff>1</staff>
         <beam number="1">end</beam>
-        <notations><technical><fingering>1</fingering></technical></notations></note>
+        <notations><technical><fingering>3</fingering></technical></notations></note>
       <backup>
         <duration>8</duration>
         </backup>
@@ -13765,7 +13765,7 @@
         <type>quarter</type>
         <stem>down</stem>
         <staff>1</staff>
-        <notations><technical><fingering>3</fingering></technical></notations></note>
+        <notations><technical><fingering>2</fingering></technical></notations></note>
       <note default-x="49.63" default-y="-15.00">
         <pitch>
           <step>C</step>
@@ -13777,7 +13777,7 @@
         <stem>down</stem>
         <staff>1</staff>
         <beam number="1">begin</beam>
-        <notations><technical><fingering>2</fingering></technical></notations></note>
+        <notations><technical><fingering>1</fingering></technical></notations></note>
       <note default-x="74.05" default-y="-10.00">
         <pitch>
           <step>D</step>
@@ -13789,7 +13789,7 @@
         <stem>down</stem>
         <staff>1</staff>
         <beam number="1">end</beam>
-        <notations><technical><fingering>1</fingering></technical></notations></note>
+        <notations><technical><fingering>2</fingering></technical></notations></note>
       <note default-x="98.47" default-y="-20.00">
         <rest />
         <duration>1</duration>
@@ -13810,7 +13810,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>3</fingering></technical>
+            <fingering>5</fingering></technical>
           </notations>
         </note>
       <backup>
@@ -13902,7 +13902,7 @@
         <dot />
         <stem>down</stem>
         <staff>2</staff>
-        <notations><technical><fingering>2</fingering></technical></notations></note>
+        <notations><technical><fingering>1</fingering></technical></notations></note>
       <note default-x="156.96" default-y="-98.53">
         <pitch>
           <step>E</step>
@@ -13916,7 +13916,7 @@
         <staff>2</staff>
         <notations>
           <tied type="start" />
-          <technical><fingering>1</fingering></technical></notations>
+          <technical><fingering>2</fingering></technical></notations>
         </note>
       </measure>
     <measure number="167" width="179.29">
@@ -13965,7 +13965,7 @@
         <stem>down</stem>
         <staff>1</staff>
         <beam number="1">end</beam>
-        <notations><technical><fingering>1</fingering></technical></notations></note>
+        <notations><technical><fingering>3</fingering></technical></notations></note>
       <backup>
         <duration>8</duration>
         </backup>
@@ -13982,7 +13982,7 @@
         <staff>2</staff>
         <notations>
           <tied type="stop" />
-          <technical><fingering>1</fingering></technical></notations>
+          <technical><fingering>3</fingering></technical></notations>
         </note>
       <note default-x="38.27" default-y="-88.53">
         <pitch>
@@ -14028,7 +14028,7 @@
         <type>quarter</type>
         <stem>down</stem>
         <staff>1</staff>
-        <notations><technical><fingering>2</fingering></technical></notations></note>
+        <notations><technical><fingering>1</fingering></technical></notations></note>
       <note default-x="107.76" default-y="0.00">
         <pitch>
           <step>F</step>
@@ -14040,7 +14040,7 @@
         <stem>down</stem>
         <staff>1</staff>
         <beam number="1">begin</beam>
-        <notations><technical><fingering>1</fingering></technical></notations></note>
+        <notations><technical><fingering>2</fingering></technical></notations></note>
       <note default-x="133.03" default-y="5.00">
         <pitch>
           <step>G</step>
@@ -14052,7 +14052,7 @@
         <stem>down</stem>
         <staff>1</staff>
         <beam number="1">end</beam>
-        <notations><technical><fingering>2</fingering></technical></notations></note>
+        <notations><technical><fingering>3</fingering></technical></notations></note>
       <backup>
         <duration>8</duration>
         </backup>
@@ -14143,7 +14143,7 @@
         <stem>down</stem>
         <staff>1</staff>
         <beam number="1">end</beam>
-        <notations><technical><fingering>1</fingering></technical></notations></note>
+        <notations><technical><fingering>3</fingering></technical></notations></note>
       <backup>
         <duration>8</duration>
         </backup>
@@ -14519,7 +14519,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <harmony print-frame="no">
@@ -14604,7 +14604,7 @@
         <voice>1</voice>
         <type>whole</type>
         <staff>1</staff>
-        <notations><technical><fingering>1</fingering></technical></notations></note>
+        <notations><technical><fingering>2</fingering></technical></notations></note>
       <backup>
         <duration>8</duration>
         </backup>
@@ -14620,7 +14620,7 @@
         <staff>2</staff>
         <notations>
           <technical>
-            <fingering>3</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       <note default-x="46.31" default-y="-130.00">
@@ -14636,7 +14636,7 @@
         <beam number="1">begin</beam>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>5</fingering></technical>
           </notations>
         </note>
       <note default-x="67.88" default-y="-115.00">
@@ -14670,7 +14670,7 @@
         <staff>2</staff>
         <notations>
           <tied type="stop" />
-          <technical><fingering>2</fingering></technical></notations>
+          <technical><fingering>1</fingering></technical></notations>
         </note>
       <note default-x="121.81" default-y="-110.00">
         <pitch>
@@ -14684,7 +14684,7 @@
         <staff>2</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       </measure>
@@ -14747,7 +14747,7 @@
         <staff>2</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="13.00" default-y="-120.00">
@@ -14852,7 +14852,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="101.97" default-y="-10.00">
@@ -14865,7 +14865,7 @@
         <type>quarter</type>
         <stem>down</stem>
         <staff>1</staff>
-        <notations><technical><fingering>1</fingering></technical></notations></note>
+        <notations><technical><fingering>2</fingering></technical></notations></note>
       <backup>
         <duration>8</duration>
         </backup>
@@ -14896,7 +14896,7 @@
         <staff>2</staff>
         <notations>
           <technical>
-            <fingering>4</fingering></technical>
+            <fingering>5</fingering></technical>
           </notations>
         </note>
       <note default-x="77.71" default-y="-110.00">
@@ -14958,7 +14958,7 @@
         <type>quarter</type>
         <stem>down</stem>
         <staff>1</staff>
-        <notations><technical><fingering>1</fingering></technical></notations></note>
+        <notations><technical><fingering>3</fingering></technical></notations></note>
       <note default-x="110.06" default-y="-5.00">
         <pitch>
           <step>E</step>
@@ -15082,7 +15082,7 @@
         <type>quarter</type>
         <stem>up</stem>
         <staff>2</staff>
-        <notations><technical><fingering>4</fingering></technical></notations></note>
+        <notations><technical><fingering>5</fingering></technical></notations></note>
       <note default-x="120.48" default-y="-120.00">
         <pitch>
           <step>E</step>
@@ -15181,7 +15181,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="94.97" default-y="-20.00">
@@ -15194,7 +15194,7 @@
         <type>quarter</type>
         <stem>down</stem>
         <staff>1</staff>
-        <notations><technical><fingering>1</fingering></technical></notations></note>
+        <notations><technical><fingering>2</fingering></technical></notations></note>
       <backup>
         <duration>8</duration>
         </backup>
@@ -15225,7 +15225,7 @@
         <staff>2</staff>
         <notations>
           <technical>
-            <fingering>4</fingering></technical>
+            <fingering>5</fingering></technical>
           </notations>
         </note>
       <note default-x="72.62" default-y="-110.00">
@@ -15261,7 +15261,7 @@
         <type>quarter</type>
         <stem>down</stem>
         <staff>1</staff>
-        <notations><technical><fingering>2</fingering></technical></notations></note>
+        <notations><technical><fingering>1</fingering></technical></notations></note>
       <note default-x="42.81" default-y="-15.00">
         <pitch>
           <step>C</step>
@@ -15272,7 +15272,7 @@
         <type>quarter</type>
         <stem>down</stem>
         <staff>1</staff>
-        <notations><technical><fingering>1</fingering></technical></notations></note>
+        <notations><technical><fingering>3</fingering></technical></notations></note>
       <note default-x="72.62" default-y="-15.00">
         <pitch>
           <step>C</step>
@@ -15283,7 +15283,7 @@
         <type>half</type>
         <stem>down</stem>
         <staff>1</staff>
-        <notations><technical><fingering>1</fingering></technical></notations></note>
+        <notations><technical><fingering>2</fingering></technical></notations></note>
       <backup>
         <duration>8</duration>
         </backup>
@@ -15490,7 +15490,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>3</fingering></technical>
           </notations>
         </note>
       <note default-x="94.97" default-y="-10.00">
@@ -15503,7 +15503,7 @@
         <type>quarter</type>
         <stem>down</stem>
         <staff>1</staff>
-        <notations><technical><fingering>1</fingering></technical></notations></note>
+        <notations><technical><fingering>2</fingering></technical></notations></note>
       <backup>
         <duration>8</duration>
         </backup>
@@ -15534,7 +15534,7 @@
         <staff>2</staff>
         <notations>
           <technical>
-            <fingering>4</fingering></technical>
+            <fingering>5</fingering></technical>
           </notations>
         </note>
       <note default-x="72.62" default-y="-110.00">
@@ -15596,7 +15596,7 @@
         <type>quarter</type>
         <stem>down</stem>
         <staff>1</staff>
-        <notations><technical><fingering>1</fingering></technical></notations></note>
+        <notations><technical><fingering>3</fingering></technical></notations></note>
       <note default-x="102.42" default-y="-5.00">
         <pitch>
           <step>E</step>
@@ -15720,7 +15720,7 @@
         <type>quarter</type>
         <stem>up</stem>
         <staff>2</staff>
-        <notations><technical><fingering>4</fingering></technical></notations></note>
+        <notations><technical><fingering>5</fingering></technical></notations></note>
       <note default-x="128.75" default-y="-120.00">
         <pitch>
           <step>E</step>
@@ -15863,7 +15863,7 @@
         <staff>2</staff>
         <notations>
           <technical>
-            <fingering>4</fingering></technical>
+            <fingering>5</fingering></technical>
           </notations>
         </note>
       <note default-x="80.89" default-y="-110.00">
@@ -16068,7 +16068,7 @@
         <staff>1</staff>
         <notations>
           <technical>
-            <fingering>2</fingering></technical>
+            <fingering>1</fingering></technical>
           </notations>
         </note>
       <note default-x="98.82" default-y="0.00">
@@ -16082,7 +16082,7 @@
         <stem>down</stem>
         <staff>1</staff>
         <beam number="1">begin</beam>
-        <notations><technical><fingering>1</fingering></technical></notations></note>
+        <notations><technical><fingering>2</fingering></technical></notations></note>
       <note default-x="121.45" default-y="5.00">
         <pitch>
           <step>G</step>
@@ -16094,7 +16094,7 @@
         <stem>down</stem>
         <staff>1</staff>
         <beam number="1">end</beam>
-        <notations><technical><fingering>2</fingering></technical></notations></note>
+        <notations><technical><fingering>3</fingering></technical></notations></note>
       <backup>
         <duration>8</duration>
         </backup>
@@ -16183,7 +16183,7 @@
         <stem>down</stem>
         <staff>1</staff>
         <beam number="1">end</beam>
-        <notations><technical><fingering>1</fingering></technical></notations></note>
+        <notations><technical><fingering>3</fingering></technical></notations></note>
       <backup>
         <duration>8</duration>
         </backup>
@@ -16271,7 +16271,7 @@
         <stem>down</stem>
         <staff>1</staff>
         <beam number="1">begin</beam>
-        <notations><technical><fingering>2</fingering></technical></notations></note>
+        <notations><technical><fingering>3</fingering></technical></notations></note>
       <note default-x="202.21" default-y="5.00">
         <pitch>
           <step>G</step>
@@ -16283,7 +16283,7 @@
         <stem>down</stem>
         <staff>1</staff>
         <beam number="1">end</beam>
-        <notations><technical><fingering>1</fingering></technical></notations></note>
+        <notations><technical><fingering>2</fingering></technical></notations></note>
       <backup>
         <duration>8</duration>
         </backup>
@@ -16553,7 +16553,7 @@
         <type>quarter</type>
         <stem>down</stem>
         <staff>1</staff>
-        <notations><technical><fingering>1</fingering></technical></notations></note>
+        <notations><technical><fingering>3</fingering></technical></notations></note>
       <note default-x="91.06" default-y="-10.00">
         <pitch>
           <step>D</step>
@@ -16694,7 +16694,7 @@
         <staff>2</staff>
         <notations>
           <tied type="stop" />
-          <technical><fingering>2</fingering></technical></notations>
+          <technical><fingering>5</fingering></technical></notations>
         </note>
       <note default-x="142.46" default-y="-80.00">
         <pitch>
@@ -16708,7 +16708,7 @@
         <staff>2</staff>
         <notations>
           <technical>
-            <fingering>1</fingering></technical>
+            <fingering>2</fingering></technical>
           </notations>
         </note>
       </measure>
