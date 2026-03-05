@@ -115,18 +115,20 @@ Benchmark: 20 files, Right Hand only, 4,550 notes.
 
 > **⚠️ Pattern Library trade-off:** Hard-coded scale/arpeggio rules có thể conflict với global Viterbi optimization — đây là lý do cốt lõi để chuyển sang **neural ranker** ở Phase 3.
 
-### 🔬 Error Analysis (3,089 wrong predictions)
+### 🔬 Error Analysis — Phase 2.8 (2,468 wrong / 4,550 total)
 
-| Error | Count | % |
-|---|:---:|:---:|
-| **THUMB_MISS** | 1,478 | **47.8%** |
-| **OFF_BY_ONE** | 901 | **29.2%** |
-| SCALE_ERROR | 363 | 11.8% |
-| CHORD_ERROR | 251 | 8.1% |
-| LARGE_JUMP | 61 | 2.0% |
-| OTHER | 35 | 1.1% |
+| Error | Count | % errors | Note |
+|---|:---:|:---:|---|
+| **OFF_BY_ONE** | **1,042** | **42.2%** | gt=3 pred=2 — sai 1 ngón |
+| **THUMB_MISS** | **842** | **34.1%** | -636 so với phase cũ ✅ |
+| SCALE_ERROR | 284 | 11.5% | |
+| CHORD_ERROR | 251 | 10.2% | |
+| LARGE_JUMP | 30 | 1.2% | |
+| OTHER | 19 | 0.8% | |
 
-**Top confusions:** f3→f2 (417x), f2→f1 (362x), f1→f2 (310x) — hệ thống còn thiên vị ngón 1–2.
+**Top confusions:** f3→f2 (432x), f2→f1 (315x), f4→f3 (295x)
+
+Systematic bias: hệ thống predict ngón **thấp hơn GT 1 bậc** — biết đúng hand position nhưng chọn sai finger trong position. Next target: tuning finger bias trong cùng anchor.
 
 ---
 
