@@ -59,6 +59,20 @@ ASCENDING_FINGER_BIAS  = 0.6  # Light penalty: ascending + finger goes DOWN unex
 DESCENDING_FINGER_BIAS = 0.4  # Light penalty: descending + finger goes UP unexpectedly
 REGISTER_MISMATCH_COST = 0.5  # Thumb on mid-high note in non-forced context
 
+# ── Nguyên tắc 5: Tránh ngón 4 nếu có thể ───────────────────────────────
+# Ring finger (4) là ngón yếu nhất và ít độc lập nhất — gân nó chia sẻ với
+# ngón 3 và 5. Pianist thực tế tránh dùng ngón 4 ở nốt đơn lẻ khi có lựa
+# chọn tốt hơn (1-2-3 hoặc 5). Penalty nhẹ để không override các trường hợp
+# thực sự cần ngón 4 (scale Bb, chord rải, v.v.).
+FINGER4_SOLO_PENALTY   = 0.8  # Soft penalty: ngón 4 ở vị trí không cần thiết
+
+# ── Nguyên tắc 11: Ngón dài cho phím đen ─────────────────────────────────
+# Phím đen nằm sâu hơn ~10mm so với phím trắng. Pianist tự nhiên dùng ngón
+# dài (2, 3, 4) để nhấn phím đen vì chúng với tới đúng độ sâu đó mà không
+# cần cổ tay điều chỉnh. Ngón 1 và 5 trên phím đen đã bị penalize (THUMB_ON_BLACK,
+# PINKY_ON_BLACK). Complement bằng reward ngón 2/3/4:
+BLACK_KEY_LONG_FINGER_REWARD = -1.2  # Reward ngón 2/3/4 trên phím đen
+
 # ---- Intent modifiers ----
 LEGATO_SUBST_REWARD  = -3.0   # Finger substitution in legato context
 LEGATO_BREAK_PENALTY = 8.0    # Additional OFOK in legato
@@ -174,9 +188,16 @@ class PhraseScopedDP:
             cost += THUMB_ON_BLACK
         if note.is_black and finger == 5:
             cost += PINKY_ON_BLACK
+        # Nguyên tắc 11: reward ngón dài trên phím đen (init note)
+        if note.is_black and finger in (2, 3, 4):
+            cost += BLACK_KEY_LONG_FINGER_REWARD  # negative = reward
         # On first note of phrase, prefer thumb/index for ascending phrases
         if phrase.arc_type.name in ('CLIMB', 'ARCH') and finger > 3:
             cost += 1.5
+
+        # Nguyên tắc 5: soft penalty cho ngón 4 ở đầu phrase
+        if finger == 4:
+            cost += FINGER4_SOLO_PENALTY
 
         # ── Phase 4: Register mismatch ─────────────────────────────────────
         # A pianist naturally uses higher fingers (3-4) for mid-range melody notes,
@@ -248,6 +269,11 @@ class PhraseScopedDP:
         if pair in {(3, 4), (4, 5), (3, 5)}:
             cost += WEAK_PAIR_PENALTY
 
+        # Nguyên tắc 5: soft penalty khi landing trên ngón 4
+        # (không áp dụng khi ngón 4 là một phần của weak pair đã penalize)
+        if f_curr == 4 and pair not in {(3, 4), (4, 5)}:
+            cost += FINGER4_SOLO_PENALTY
+
         # ── Biomechanics: tendon coupling penalty ────────────────────
         # Ring finger (4) shares a tendon with middle (3).
         # At speed, alternating 3-4 or 4-5 is much harder than 1-2 or 2-3.
@@ -257,12 +283,15 @@ class PhraseScopedDP:
             bpm=bpm,
         )
 
-        # --- Ergonomic: black key penalties ---
+        # --- Ergonomic: black key penalties + Nguyên tắc 11 (ngón dài preference) ---
         if note_curr.is_black:
             if f_curr == 1:
                 cost += THUMB_ON_BLACK
-            if f_curr == 5:
+            elif f_curr == 5:
                 cost += PINKY_ON_BLACK
+            elif f_curr in (2, 3, 4):
+                # Nguyên tắc 11: ngón dài tự nhiên với phím đen
+                cost += BLACK_KEY_LONG_FINGER_REWARD  # negative = reward
 
         # --- Ergonomic: crossing ---
         hand = note_curr.hand
