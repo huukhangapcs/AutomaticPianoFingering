@@ -15,7 +15,7 @@ Hệ thống này mô phỏng đúng quy trình đó thay vì tối ưu ergonomi
 
 ---
 
-## 🏗️ Kiến trúc (Phase 2.6 — Physical Keyboard Model + Lazy First Principle)
+## 🏗️ Kiến trúc (Phase 2.7 — Full Hand State Model)
 
 ```
 MusicXML File
@@ -132,7 +132,7 @@ AutomaticPianoFingering/
 │       └── pipeline.py             # Main orchestrator (PhraseAwareFingering)
 ├── tests/
 │   └── phrasing/
-│       └── test_phrase_aware.py    # 43 unit tests (7 test classes)
+│       └── test_phrase_aware.py    # 51 unit tests (8 test classes)
 ├── scripts/
 │   ├── demo_musicxml.py            # Single-staff demo + GT comparison
 │   ├── demo_grand_staff.py         # Grand staff demo (RH + LH separately)
@@ -150,7 +150,7 @@ AutomaticPianoFingering/
 
 ```bash
 python -m pytest tests/ -q
-# 43 passed in 0.07s ✅
+# 51 passed in 0.10s ✅
 ```
 
 ### Match rate vs. PIG dataset (Ground Truth annotations)
@@ -168,7 +168,8 @@ Benchmark trên 20 file đầu tiên của **PIG Piano Fingering Dataset v1.2** 
 | + Finger-4 penalty + Black key long finger | 35.47% | 35.66% |
 | + Lookahead stitch + Phrase-final lengthening | 35.54% | 35.73% |
 | + Large leap reposition + Sequential stepwise reward | 37.12% | 37.38% |
-| **+ Physical Keyboard Model + Lazy First Principle** | **38.00%** | **38.21%** |
+| + Physical Keyboard Model + Lazy First Principle | 38.00% | 38.21% |
+| **+ Full Hand State Model (thumb_mm)** | **44.00%** | **43.74%** |
 
 > **Note:** GT annotations reflect personal stylistic preferences. The same piece fingered by different professional pianists differs 30–40%, so ~32% match against a single annotator's style is realistic for a rule-based system.
 
@@ -252,14 +253,21 @@ python scripts/error_analysis.py 20
 
 | Module | Mô tả |
 |--------|-------|
-| `keyboard.py` [v3] | `physical_key_position_mm()` — vị trí thực (mm) theo Steinway layout; `MAX_SPAN_MM` anthropometry (Li et al. 2016); `physical_span_mm()`, `finger_max_span_mm()`, `is_in_hand_position()` |
-| `phrase_dp.py` [v3] | **Lazy First Principle** — `IN_POSITION_REWARD = -1.5` thưởng note trong tầm tay; stretch cost chuyển sang mm domain (`over_mm² × 0.003`) |
-| `hand_position.py` [v3] | Quadratic inertia: linear `0.3x` → `0.5x·excess²` — 10-semitone shift: penalty ×12 (2.1 → 24.5) |
-| Tests | **43 unit tests** pass |
+| `keyboard.py` [v3] | `physical_key_position_mm()`, `MAX_SPAN_MM` anthropometry, `physical_span_mm()`, `finger_max_span_mm()`, `is_in_hand_position()` |
+| `phrase_dp.py` [v3] | **Lazy First Principle** — `IN_POSITION_REWARD = -1.5`; stretch cost mm domain |
+| `hand_position.py` [v3] | Quadratic inertia: 10-semitone shift penalty ×12 |
+
+### ✅ Phase 2.7 — Hoàn thành
+
+| Module | Mô tả |
+|--------|-------|
+| `hand_position.py` [v4] | `HandState` dataclass: `thumb_mm` = toạ độ mm của ngón cái; `infer(note,f)` tính thumb_mm thực; `is_in_position()` check 5-finger coverage |
+| `phrase_dp.py` [v4] | Dùng `HandState.is_in_position()` cho Lazy First Principle; shift_cost v2 dùng thumb_mm delta (không còn so sánh MIDI pitch) |
+| Tests | **51 unit tests** pass (+ 8 HandState tests mới) |
 
 ### 🚧 Phase 3 — Tiếp theo (Neural)
 
-Rule-based engine đã đạt **trần hiệu suất ~38%**. Bước tiếp theo yêu cầu neural model để vượt ngưỡng này.
+Rule-based engine đã đạt **trần hiệu suất ~44%**. Bước tiếp theo yêu cầu neural model để vượt ngưỡng này.
 
 | Priority | Việc cần làm | Mục tiêu |
 |----------|-------------|----------|
@@ -294,6 +302,7 @@ Rule-based engine đã đạt **trần hiệu suất ~38%**. Bước tiếp theo
 | Kiểm tra lỗi | "Ngón này không thể" | ✅ FingeredAuditor |
 | Vị trí phím thực (mm) | Steinway layout, anthropometry | ✅ Physical Keyboard Model |
 | Ưu tiên giữ tầm tay | Lazy First Principle — ít di chuyển | ✅ IN_POSITION_REWARD |
+| Aware từng ngón ở đâu | 5 ngón = 5 toạ độ mm từ thumb_mm | ✅ HandState model |
 | Học từ data | Điều chỉnh phong cách | 🚧 Phase 3 — Neural Model |
 
 ---
