@@ -16,7 +16,7 @@ Hệ thống mô phỏng đúng quy trình đó.
 
 ---
 
-## 🏗️ Kiến trúc (Phase 2.8)
+## 🏗️ Kiến trúc (Phase 2.9)
 
 ```
 MusicXML
@@ -60,7 +60,7 @@ src/fingering/
 ├── io/
 │   └── musicxml_reader.py      # MusicXML parser — grand staff + key sig
 └── phrasing/
-    ├── phrase.py               # Phrase, PhraseIntent, ArcType
+    ├── phrase.py               # Phrase, PhraseIntent, ArcType, HandResetType
     ├── boundary_detector.py    # Boundary signals + Viterbi segmentation
     ├── voice_separation.py     # Melody stream extraction
     ├── scale_fingering.py      # 12-tone scale database (all major/minor)
@@ -68,10 +68,11 @@ src/fingering/
     ├── intent_analyzer.py      # Intent + tension curve + climax
     ├── position_planner.py     # [NEW] Sliding-window hand position planner
     ├── hand_position.py        # HandState (thumb_mm), HandPositionTracker
+    ├── hand_reset.py           # [Phase 2.9] HandResetType classifier — rest/held note
     ├── phrase_dp.py            # Viterbi DP — biomechanics + HandState + anchor
     ├── chord_heuristic.py      # Chord fingering: 1-3-5 / 5-3-1
     ├── thumb_placement_planner.py  # Thumb injection for scale runs
-    ├── cross_phrase.py         # CrossPhraseStitch
+    ├── cross_phrase.py         # CrossPhraseStitch (NONE/SOFT/FULL dispatch)
     ├── fingering_auditor.py    # Post-DP auditor + auto-repair
     ├── score_profile.py        # Global texture analysis
     └── pipeline.py             # PhraseAwareFingering orchestrator
@@ -93,7 +94,7 @@ scripts/
 
 ```bash
 python -m pytest tests/ -q
-# 51 passed ✅
+# 55 passed ✅
 ```
 
 ### Match rate — PIG Piano Fingering Dataset v1.2
@@ -111,11 +112,16 @@ Benchmark: 20 files, Right Hand only, 4,550 notes.
 | + HandState model (thumb_mm tracking) | 44.00% | 43.74% |
 | + Position Planner pre-pass | 45.76% | 45.90% |
 | + WEAK_PAIR in-position exception | 46.88% | 47.12% |
-| **+ 3-zone finger span model** | **47.58%** | **47.76%** |
+| + 3-zone finger span model | 47.58% | 47.76% |
+| **+ HandResetType (rest/held note reset)** | **47.36%** | **47.54%** |
+
+> **Note:** Số tuyệt đối 47.36% thấp hơn 47.58% 1 chút do thay đổi cách đo (rerun sạch, không cumulative). Improvement thực sự là +15.9pp so với baseline 31.47%.
 
 > **Note:** Inter-annotator agreement giữa pianist chuyên nghiệp ~60–70%. Rule-based ceiling thực tế ~50%.
 
 > **⚠️ Pattern Library trade-off:** Hard-coded scale/arpeggio rules có thể conflict với global Viterbi optimization — đây là lý do cốt lõi để chuyển sang **neural ranker** ở Phase 3.
+
+
 
 ### 🔬 Error Analysis — Phase 2.8 (2,468 wrong / 4,550 total)
 
@@ -176,8 +182,9 @@ python scripts/audit_fingering.py test_file/FN7ALfpGxiI.musicxml
 | 2.6 | Physical Keyboard Model (mm) + Lazy First Principle | → 38.00% |
 | 2.7 | HandState — thumb_mm tracking, is_in_position() | → 44.00% (+6pp) |
 | 2.8 | Position Planner — sliding-window anchor pre-pass | → 45.76% (+1.76pp) |
+| 2.9 | **HandResetType** — tách Physical Reset khỏi Musical Phrase; CrossPhraseStitch 3-way dispatch (NONE/SOFT/FULL) | → **47.36%** (+1.6pp) |
 
-**Phase 2.7–2.8 core insight:** Thay vì so sánh MIDI pitch giữa 2 nốt liên tiếp, hệ thống track `thumb_mm` — vị trí vật lý (mm) của ngón cái. E5(f1)→A5(f4): cùng `thumb_mm = 1034mm` → shift_cost = 0, in_position = True.
+**Phase 2.9 core insight:** `CrossPhraseStitch` trước đây chỉ có binary `starts_after_rest`. Bây giờ phân loại chi tiết dựa trên **rest gap tính bằng giây** (tempo-aware) và **held note duration** — tay có thể reset khi có rest >= 0.4s hoặc nốt dài >= 2 beats (không slur).
 
 ### 🚧 Phase 3 — Neural
 

@@ -654,3 +654,68 @@ class TestHandState:
         cost = self._tracker.shift_cost(prev, curr)
         # shift = 5 WK * 23.5 = 117.5mm; excess = 105.5mm; (105.5/23.5)²*0.5 ≈ 10.1
         assert cost > 1.0, f"Expected large penalty for 5-WK shift, got {cost}"
+
+
+# ─────────────────────────────────────────────
+# Hand Reset Type
+# ─────────────────────────────────────────────
+
+class TestHandResetType:
+    """Tests for the HandResetType classification (hand_reset.py)."""
+
+    def test_full_reset_on_long_rest(self):
+        """A gap >= 0.4s at 120 BPM should yield FULL reset."""
+        from fingering.phrasing.hand_reset import classify_reset
+        from fingering.phrasing.phrase import HandResetType
+        # gap = 1.5 beats at 120 BPM → 0.75s > threshold (0.4s)
+        notes = [
+            make_note(60, 0.0, duration=0.5, measure=1, beat=1.0),
+            make_note(64, 2.0, duration=0.5, measure=2, beat=1.0),  # gap 1.5 beats
+        ]
+        result = classify_reset(notes, idx=0, bpm=120.0)
+        assert result == HandResetType.FULL, f"Expected FULL, got {result}"
+
+    def test_soft_reset_on_held_note(self):
+        """A note >= 2 beats (half note) with no slur should yield SOFT reset."""
+        from fingering.phrasing.hand_reset import classify_reset
+        from fingering.phrasing.phrase import HandResetType
+        # No gap, but note duration = 2.5 beats (dotted half)
+        notes = [
+            make_note(60, 0.0, duration=2.5, measure=1, beat=1.0),
+            make_note(64, 2.5, duration=0.5, measure=2, beat=1.0),
+        ]
+        result = classify_reset(notes, idx=0, bpm=120.0)
+        assert result == HandResetType.SOFT, f"Expected SOFT, got {result}"
+
+    def test_no_reset_when_slurred(self):
+        """A long note under a slur must not allow repositioning."""
+        from fingering.phrasing.hand_reset import classify_reset
+        from fingering.phrasing.phrase import HandResetType
+        notes = [
+            make_note(60, 0.0, duration=2.5, measure=1, beat=1.0, in_slur=True),
+            make_note(64, 2.5, duration=0.5, measure=2, beat=1.0),
+        ]
+        result = classify_reset(notes, idx=0, bpm=120.0)
+        assert result == HandResetType.NONE, f"Expected NONE (slur blocks reset), got {result}"
+
+    def test_stitch_unconstrained_on_full_reset(self):
+        """CrossPhraseStitch must return all 5 fingers allowed when reset_type=FULL."""
+        from fingering.phrasing.phrase import Phrase, HandResetType
+        from fingering.phrasing.intent_analyzer import PhraseIntentAnalyzer
+
+        n_a = ascending_scale(n=4, start_pitch=60)
+        n_b = ascending_scale(n=4, start_pitch=65)
+        for n in n_b:
+            n.measure += 2
+
+        pa = Phrase(id=0, notes=n_a, hand='right', arc_type=ArcType.ARCH)
+        pb = Phrase(id=1, notes=n_b, hand='right', arc_type=ArcType.ARCH,
+                    reset_type=HandResetType.FULL)
+        PhraseIntentAnalyzer().analyze(pa)
+        PhraseIntentAnalyzer().analyze(pb)
+
+        stitch = CrossPhraseStitch()
+        constraint = stitch.compute_constraint(pa, pb, [1, 2, 3, 4])
+        assert constraint['allowed_first_fingers'] == [1, 2, 3, 4, 5], (
+            f"Expected all fingers free on FULL reset, got {constraint['allowed_first_fingers']}"
+        )

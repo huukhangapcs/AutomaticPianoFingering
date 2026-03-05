@@ -14,8 +14,9 @@ from __future__ import annotations
 from typing import List, Tuple
 from fingering.models.note_event import NoteEvent
 from fingering.phrasing.phrase import (
-    Phrase, PhraseBoundarySignal, ArcType
+    Phrase, PhraseBoundarySignal, ArcType, HandResetType
 )
+from fingering.phrasing.hand_reset import classify_reset
 
 # --- Constants ---
 
@@ -712,35 +713,30 @@ class PhraseBoundaryDetector:
             if not phrase_notes:
                 continue
 
-            # Detect if this phrase starts after a rest
+            # ── Physical reset classification ─────────────────────────────
+            # Use the last note of the PREVIOUS phrase (at index start-1)
+            # to determine how much freedom this phrase has to start fresh.
+            reset = HandResetType.NONE
             starts_after_rest = False
             if start > 0:
-                prev_note = notes[start - 1]
-                gap = phrase_notes[0].onset - prev_note.offset
-                starts_after_rest = gap > 0.1
+                # Pass bpm from NoteEvent if available, else default 120
+                bpm = getattr(notes[start - 1], 'tempo', 120.0) or 120.0
+                reset = classify_reset(notes, idx=start - 1, bpm=bpm)
+                starts_after_rest = (reset != HandResetType.NONE)
 
             # Detect the arc for this specific phrase
             arc = detect_arc_type(phrase_notes)
 
             hand = phrase_notes[0].hand  # Assume consistent hand per phrase
 
-            # The boundary score logic has moved entirely to Viterbi
-            # For Phrase object storage, we can reconstruct the raw logit probability
-            boundary_score = 0.0
-            if start > 0:
-                from fingering.phrasing.phrase import PhraseBoundarySignal
-                _dummy = PhraseBoundarySignal(position=start - 1)
-                # Find the actual signal in the pipeline, or default to 0
-                # For simplicity, we'll leave it 0 since it isn't crucial downstream 
-                pass
-
             phrase = Phrase(
                 id=phrase_id,
                 notes=phrase_notes,
                 hand=hand,
-                boundary_score=boundary_score,
+                boundary_score=0.0,
                 arc_type=arc,
                 starts_after_rest=starts_after_rest,
+                reset_type=reset,
             )
             phrases.append(phrase)
 

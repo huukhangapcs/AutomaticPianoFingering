@@ -19,7 +19,7 @@ from fingering.models.note_event import NoteEvent
 from fingering.core.keyboard import (
     white_key_span, finger_span_limits, is_ascending
 )
-from fingering.phrasing.phrase import Phrase, ArcType
+from fingering.phrasing.phrase import Phrase, ArcType, HandResetType
 
 # If junction score exceeds this, it's a "crash" — hard constraint
 CRASH_THRESHOLD = 15.0
@@ -58,9 +58,14 @@ class CrossPhraseStitch:
         if not fingering_a or not phrase_a.notes or not phrase_b.notes:
             return self._unconstrained()
 
-        # If phrase_b starts after a rest → full freedom
-        if phrase_b.starts_after_rest:
+        # ── 3-way reset dispatch ──────────────────────────────────────
+        # Reset type tells us how much physical freedom exists between phrases.
+        if phrase_b.reset_type == HandResetType.FULL:
+            # Long rest: hand can land anywhere — no stitch penalty
             return self._unconstrained()
+        if phrase_b.reset_type == HandResetType.SOFT:
+            # Short rest or held note: relax stitch, but still guide the DP
+            return self._soft_constrained(phrase_a, phrase_b, fingering_a)
 
         last_finger = fingering_a[-1]
         last_note   = phrase_a.notes[-1]
@@ -216,6 +221,48 @@ class CrossPhraseStitch:
             cost += 5.0
 
         return cost
+
+    def _soft_constrained(
+        self,
+        phrase_a: Phrase,
+        phrase_b: Phrase,
+        fingering_a: List[int],
+    ) -> Dict:
+        """
+        Soft reset: stitch threshold doubled — more fingers are allowed,
+        but ergonomically extreme transitions are still penalized.
+
+        Pianist analogy: a short rest lets you reposition, but not wildly—
+        e.g. an 8th-note rest gives time to move, but not a full arm-swing.
+        """
+        last_finger = fingering_a[-1]
+        last_note   = phrase_a.notes[-1]
+        first_note  = phrase_b.notes[0]
+
+        soft_threshold = STITCH_COST_THRESHOLD * 2.0   # Relaxed
+
+        allowed: List[int] = []
+        costs:   Dict[int, float] = {}
+
+        for f_start in range(1, 6):
+            cost = self._junction_cost(last_note, last_finger,
+                                       first_note, f_start)
+            costs[f_start] = cost
+            if cost < soft_threshold:
+                allowed.append(f_start)
+
+        # At minimum allow the 3 cheapest options
+        if len(allowed) < 3:
+            allowed = sorted(costs, key=costs.get)[:3]
+
+        preferred = min(allowed, key=lambda f: costs[f]) if allowed else None
+
+        return {
+            'allowed_first_fingers': allowed,
+            'preferred_first_finger': preferred,
+            'is_junction_crash': False,   # Soft reset never counts as crash
+            'junction_costs': costs,
+        }
 
     def _unconstrained(self) -> Dict:
         return {

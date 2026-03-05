@@ -27,6 +27,20 @@ class ArcType(Enum):
     FLAT       = auto()   # Relatively static
 
 
+class HandResetType(Enum):
+    """
+    Physical hand repositioning freedom at the START of a phrase.
+
+    Derived from the gap/held-note BEFORE the phrase begins:
+      NONE  — No reset opportunity: hand must stay in position (stitch penalty applies).
+      SOFT  — Short rest or long held note: stitch is relaxed but not abandoned.
+      FULL  — Long rest (>= ~0.4s at tempo): hand can jump anywhere freely.
+    """
+    NONE  = auto()
+    SOFT  = auto()
+    FULL  = auto()
+
+
 @dataclass
 class PhraseBoundarySignal:
     """
@@ -126,6 +140,7 @@ class Phrase:
 
     # --- Structural info ---
     starts_after_rest: bool = False
+    reset_type: HandResetType = field(default_factory=lambda: HandResetType.NONE)
 
     @property
     def start_beat(self) -> float:
