@@ -29,6 +29,7 @@ from fingering.phrasing.motif_engine import MotifEngine, Section
 from fingering.phrasing.harmonic_skeleton import HarmonicSkeleton, build_harmonic_skeleton
 from fingering.phrasing.phrase_selector import PhraseSelector, PhraseSelectorConfig
 from fingering.phrasing.period_detector import PeriodDetector
+from fingering.phrasing.fingering_auditor import FingeredAuditor
 
 
 class PhraseAwareFingering:
@@ -76,6 +77,7 @@ class PhraseAwareFingering:
             PhraseSelectorConfig(max_phrase_measures=max_phrase_measures)  # Fix 5
         )
         self.period_detector = PeriodDetector()  # Fix 4
+        self.auditor = FingeredAuditor()           # Post-DP validation
 
     # ──────────────────────────────────────────────────────────────
     # Public API
@@ -205,7 +207,7 @@ class PhraseAwareFingering:
     # ──────────────────────────────────────────────────────────────
 
     def _assign_fingering(self, phrases: List[Phrase]) -> List[int]:
-        """Layers B (intent) + C (DP) + D (stitch) → flat finger list."""
+        """Layers B (intent) + C (DP) + D (stitch) + Audit → flat finger list."""
         analyzed = self.analyzer.analyze_all(phrases)
 
         all_fingering: List[int] = []
@@ -219,6 +221,16 @@ class PhraseAwareFingering:
                     prev_phrase, phrase, prev_fingering
                 )
             fingering = self.dp_solver.solve(phrase, stitch_constraint=stitch)
+
+            # ── Audit + Repair ──────────────────────────────────────────
+            # Run the auditor on this phrase; if HARD violations exist,
+            # attempt an in-place repair via local greedy re-assignment.
+            hand = phrase.notes[0].hand if phrase.notes else 'right'
+            report = self.auditor.audit(phrase.notes, fingering, hand=hand)
+            if not report.is_clean:
+                fingering = self.auditor.repair(phrase.notes, fingering, hand=hand)
+            # ────────────────────────────────────────────────────────────
+
             all_fingering.extend(fingering)
             prev_phrase = phrase
             prev_fingering = fingering
