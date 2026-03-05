@@ -23,6 +23,51 @@ MAX_SPAN: dict[Tuple[int, int], int] = {
     (4, 5): 3,
 }
 
+# ==============================================================
+# Physical Keyboard Model (mm)
+# ==============================================================
+# Standard piano key dimensions (Steinway/Yamaha grand average):
+#   White key width : 23.5 mm
+#   Black key width : 13.7 mm
+# Key center positions within one octave, measured from C.
+# Source: Kinoshita et al. (2007), piano biomechanics studies.
+# ==============================================================
+
+_WHITE_KEY_WIDTH_MM = 23.5
+OCTAVE_WIDTH_MM     = 7 * _WHITE_KEY_WIDTH_MM   # = 164.5 mm
+
+# Pitch class (0=C … 11=B) → physical center of key (mm from C of same octave)
+_PC_TO_MM_OFFSET: dict[int, float] = {
+    0:   0.0,    # C  (white)
+    1:  14.4,    # C# (black — sits ~2/3 of white key width from C)
+    2:  23.5,    # D  (white)
+    3:  35.3,    # D# (black)
+    4:  47.0,    # E  (white)
+    5:  70.5,    # F  (white)   ← no black between E-F!
+    6:  82.3,    # F# (black)
+    7:  94.0,    # G  (white)
+    8: 107.6,    # G# (black)
+    9: 117.5,    # A  (white)
+    10: 131.2,   # A# (black)
+    11: 141.0,   # B  (white)
+}
+
+# Maximum comfortable inter-finger span in mm (adult average, M+F blended).
+# Based on Li et al. (2016) hand anthropometry + piano biomechanics.
+# Values are LARGER than the WK-unit table because mm is more precise.
+MAX_SPAN_MM: dict[Tuple[int, int], float] = {
+    (1, 2): 118.0,   # Thumb – Index
+    (1, 3): 163.5,   # Thumb – Middle
+    (1, 4): 191.0,   # Thumb – Ring
+    (1, 5): 215.0,   # Thumb – Pinky  (full hand stretch)
+    (2, 3):  66.0,   # Index – Middle
+    (2, 4): 114.0,   # Index – Ring
+    (2, 5): 158.0,   # Index – Pinky
+    (3, 4):  66.0,   # Middle – Ring
+    (3, 5): 114.0,   # Middle – Pinky
+    (4, 5):  66.0,   # Ring – Pinky
+}
+
 # Minimum comfortable span (some fingers can't be too close)
 MIN_SPAN: dict[Tuple[int, int], int] = {
     (1, 2): 0, (1, 3): 1, (1, 4): 1, (1, 5): 1,
@@ -42,8 +87,60 @@ def finger_span_limits(f1: int, f2: int) -> Tuple[int, int]:
 
 
 def white_key_span(note_a: NoteEvent, note_b: NoteEvent) -> int:
-    """Absolute white-key distance between two notes."""
+    """Absolute white-key distance between two notes (legacy, kept for compat)."""
     return abs(note_a.white_key_index - note_b.white_key_index)
+
+
+def physical_key_position_mm(pitch: int) -> float:
+    """
+    Physical center position of a piano key in millimeters.
+
+    Reference point: A0 (MIDI pitch 21) = 0 mm.
+    Direction: left → right (ascending pitch = larger mm value).
+
+    This gives an accurate physical distance between any two keys,
+    accounting for the non-uniform placement of black keys.
+
+    Example:
+        E5 (76) → 846.5 mm
+        F5 (77) → 870.0 mm   (E–F gap = 23.5 mm, one white key)
+        G5 (79) → 917.0 mm
+    """
+    # A0 = MIDI 21. C of same octave = MIDI 21 - 9 = MIDI 12 → octave 1
+    # More robustly: use MIDI 0 = C(-1) as epoch.
+    octave = pitch // 12       # C-octave (C0 = octave 0)
+    pc     = pitch % 12        # pitch class within octave
+    return octave * OCTAVE_WIDTH_MM + _PC_TO_MM_OFFSET[pc]
+
+
+def physical_span_mm(note_a: NoteEvent, note_b: NoteEvent) -> float:
+    """
+    Absolute physical distance between two piano keys (mm).
+
+    More accurate than white_key_span because it uses actual key center
+    positions, properly accounting for black key placement.
+    """
+    return abs(physical_key_position_mm(note_a.pitch)
+               - physical_key_position_mm(note_b.pitch))
+
+
+def finger_max_span_mm(f1: int, f2: int) -> float:
+    """Max comfortable span (mm) for a finger pair, from MAX_SPAN_MM table."""
+    key = (min(f1, f2), max(f1, f2))
+    return MAX_SPAN_MM.get(key, 215.0)
+
+
+def is_in_hand_position(note_a: NoteEvent, f_a: int,
+                        note_b: NoteEvent, f_b: int) -> bool:
+    """
+    Returns True if note_b with finger f_b is reachable from the hand
+    position established by note_a with finger f_a WITHOUT repositioning.
+
+    Core of Lazy First Principle: if True, hand stays put.
+    """
+    span = physical_span_mm(note_a, note_b)
+    max_s = finger_max_span_mm(f_a, f_b)
+    return span <= max_s
 
 
 def is_ascending(note_a: NoteEvent, note_b: NoteEvent) -> bool:

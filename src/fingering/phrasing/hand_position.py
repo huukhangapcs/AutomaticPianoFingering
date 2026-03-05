@@ -104,15 +104,19 @@ class HandPositionTracker:
         """
         Return a cost for shifting hand position between two notes.
 
-        Small shifts (≤ threshold): no penalty.
-        Large shifts (> threshold): linear penalty.
-        This discourages the DP from making unnecessary position jumps.
+        Lazy First Principle: the hand should stay put unless forced to move.
+
+        Small shifts (≤ threshold): forgiven — micro-adjustments are normal.
+        Large shifts (> threshold): QUADRATIC penalty — makes large shifts
+        very expensive, strongly discouraging unnecessary hand movement.
         """
         shift = pos_prev.semitone_shift(pos_curr)
         if shift <= _SHIFT_SEMITONE_THRESHOLD:
             return 0.0
-        # Linear penalty above threshold
-        return (shift - _SHIFT_SEMITONE_THRESHOLD) * 0.3
+        # Quadratic: 5-semitone shift → 0.5*4 = 2.0 cost
+        #            10-semitone shift → 0.5*49 = 24.5 cost (was 2.1 linear!)
+        excess = shift - _SHIFT_SEMITONE_THRESHOLD
+        return excess ** 2 * 0.5
 
 
 # ──────────────────────────────────────────────────────────────────────────

@@ -21,6 +21,7 @@ from fingering.core.keyboard import (
     white_key_span, finger_span_limits, is_ascending,
     natural_finger_order, thumb_crossing_natural,
     black_key_span_correction, tendon_coupling_penalty, tempo_adjusted_max_span,
+    physical_span_mm, finger_max_span_mm, is_in_hand_position,
 )
 from fingering.phrasing.phrase import Phrase, PhraseIntent
 from fingering.phrasing.pattern_library import apply_pattern_constraints
@@ -61,6 +62,11 @@ SHORT_STEP_CROSSING_PENALTY = 2.5  # Penalty cho crossing không cần thiết (
 # Khi di chuyển stepwise (1-2 semitones) mà ngón tăng đều (1→2, 2→3, 3→4)
 # thì không cần di chuyển bàn tay. Đây là fingering tự nhiên nhất.
 SEQUENTIAL_STEPWISE_REWARD = -2.0  # Reward mạnh cho liền-bậc-liền-ngón
+
+# ── Lazy First Principle ─────────────────────────────────────────
+# Nếu note tiếp theo nằm trong tầm tay hiện tại (không cần dịch tay),
+# reward để tạo bias mạnh cho “giữ tay cố định”.
+IN_POSITION_REWARD = -1.5   # Note nằm trong tầm tay → không cần di chuyển
 
 # ── Large leap handling ─────────────────────────────────────────
 # Khi span > 6 white keys (quảng 7 hoặc rộng hơn), pianist không stretch
@@ -259,34 +265,38 @@ class PhraseScopedDP:
             if intent not in (PhraseIntent.LEGATO, PhraseIntent.CANTABILE):
                 cost += REPEATED_THUMB_PENALTY
 
-        # ── Biomechanics: black key geometry correction ────────────────────
-        # Black keys are physically closer → effective span is smaller
-        bk_correction = black_key_span_correction(note_prev, note_curr)
-        effective_span = span + bk_correction  # bk_correction is negative
+        # ── Ergonomic: physical span (mm) + Lazy First Principle ──────────────
+        # Use physical key positions in mm (keyboard.py physical model).
+        # Black key non-uniformity is already captured in _PC_TO_MM_OFFSET,
+        # so no separate black_key_span_correction needed here.
+        span_mm = physical_span_mm(note_prev, note_curr)
+        max_mm  = finger_max_span_mm(f_prev, f_curr)
 
-        # ── Biomechanics: tempo-aware max span ────────────────────────
+        # Tempo scaling: fast playing = compact hand needed
         bpm = getattr(note_curr, 'tempo', 120.0) or 120.0
-        adjusted_max = tempo_adjusted_max_span(f_prev, f_curr, bpm)
+        if bpm >= 180:
+            max_mm *= 0.85
+        elif bpm >= 120:
+            max_mm *= 0.92
 
-        # ── Ergonomic: stretch vs large leap ─────────────────────────────
-        # For small intervals: standard quadratic stretch penalty.
-        # For LARGE LEAPS (> 6 white keys, ~a 6th+): pianist repositions the hand
-        # rather than stretching. Different cost model applies.
-        over = max(0.0, effective_span - adjusted_max)
+        over_mm = max(0.0, span_mm - max_mm)
 
         if span > LARGE_LEAP_THRESHOLD:
-            # Fixed repositioning cost (hand must jump, regardless of which fingers)
+            # Large leap: pianist repositions hand. Fixed cost + anchor guidance.
             cost += LARGE_LEAP_REPOSITION_COST
-            # Landing anchor reward: good choice of f_curr after a big leap
-            # makes the subsequent passage easier.
-            # Descending large leap → land low finger (1, 2) = pivot for going back up
-            # Ascending large leap  → land mid/high finger (3, 4, 5) = pivot for going down
             if ascending and f_curr in (3, 4, 5):
-                cost += LARGE_LEAP_ANCHOR_REWARD   # reward
+                cost += LARGE_LEAP_ANCHOR_REWARD
             elif not ascending and f_curr in (1, 2):
-                cost += LARGE_LEAP_ANCHOR_REWARD   # reward
+                cost += LARGE_LEAP_ANCHOR_REWARD
         else:
-            cost += over ** 2 * STRETCH_WEIGHT
+            # Normal range: quadratic stretch penalty in mm domain
+            # 20mm over → 20² × 0.003 = 1.2 cost  (1 octave = 164.5mm)
+            cost += over_mm ** 2 * 0.003
+
+            # Lazy First Principle — in-position reward:
+            # If the note is reachable without any hand shift, reward.
+            if over_mm == 0.0 and span_mm > 0:
+                cost += IN_POSITION_REWARD  # no stretch → hand stays put
 
         # ── Phase 3B: Hand position shift cost ───────────────────────────
         # Penalises large hand repositioning (pianist avoids unnecessary shifts).
