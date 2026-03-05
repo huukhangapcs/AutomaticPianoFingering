@@ -110,7 +110,8 @@ Benchmark: 20 files, Right Hand only, 4,550 notes.
 | + Physical Keyboard Model (mm) + Lazy First | 38.00% | 38.21% |
 | + HandState model (thumb_mm tracking) | 44.00% | 43.74% |
 | + Position Planner pre-pass | 45.76% | 45.90% |
-| **+ WEAK_PAIR in-position exception** | **46.88%** | **47.12%** |
+| + WEAK_PAIR in-position exception | 46.88% | 47.12% |
+| **+ 3-zone finger span model** | **47.58%** | **47.76%** |
 
 > **Note:** Inter-annotator agreement giữa pianist chuyên nghiệp ~60–70%. Rule-based ceiling thực tế ~50%.
 
