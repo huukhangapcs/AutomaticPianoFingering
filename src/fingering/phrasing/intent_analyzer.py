@@ -3,9 +3,13 @@ Phrase Intent Analyzer — Layer B of the Phrase-Aware Fingering module.
 
 Determines the musical intent of each detected phrase and computes the
 tension arc (climax detection), which guides phrase-scoped DP decisions.
+
+T2-B: Tension curve now blends shape (ARCH/CLIMB/FALL) with interval
+      dissonance (tritone = max tension, perfect 5th = stable).
 """
 
 from __future__ import annotations
+import math
 from typing import List
 from fingering.models.note_event import NoteEvent
 from fingering.phrasing.phrase import Phrase, PhraseIntent, ArcType
@@ -23,21 +27,44 @@ def _dynamic_rank(d: str) -> int:
     return _DYNAMIC_RANK.get(d, 5)  # default mf
 
 
+# ──────────────────────────────────────────────────────────────
+# T2-B: Interval dissonance table
+# Interval class → dissonance 0 (consonant) … 1 (maximally dissonant)
+# ──────────────────────────────────────────────────────────────
+_INTERVAL_DISSONANCE = {
+    0:  0.0,   # Unison / octave
+    7:  0.1,   # Perfect 5th
+    5:  0.1,   # Perfect 4th
+    4:  0.2,   # Major 3rd
+    3:  0.2,   # Minor 3rd
+    9:  0.3,   # Major 6th
+    8:  0.3,   # Minor 6th
+    2:  0.7,   # Major 2nd
+    10: 0.7,   # Minor 7th
+    1:  0.9,   # Minor 2nd
+    11: 0.9,   # Major 7th (leading tone)
+    6:  1.0,   # Tritone
+}
+
+
+def _dissonance_of_interval(semitones: int) -> float:
+    """Return dissonance 0–1 for a given interval in semitones."""
+    ic = abs(semitones) % 12
+    return _INTERVAL_DISSONANCE.get(ic, 0.5)
+
+
 class PhraseIntentAnalyzer:
     """
     Analyzes each Phrase to assign:
       - PhraseIntent (CANTABILE / BRILLIANT / LEGATO / STACCATO / EXPRESSIVE)
       - Climax index (highest tension note)
-      - Tension curve [0.0 → 1.0] per note
+      - Tension curve [0.0 → 1.0] per note (shape + dissonance blended)
 
     Modelled after a pianist's reading of phrase character from notation.
     """
 
     def analyze(self, phrase: Phrase) -> Phrase:
-        """
-        Mutates phrase in-place to add intent, climax_idx, tension_curve.
-        Returns the enriched phrase for chaining.
-        """
+        """Mutate phrase in-place to add intent, climax_idx, tension_curve."""
         phrase.intent = self._detect_intent(phrase)
         phrase.climax_idx = self._find_climax(phrase)
         phrase.tension_curve = self._compute_tension(phrase)
@@ -51,88 +78,51 @@ class PhraseIntentAnalyzer:
     def _detect_intent(self, phrase: Phrase) -> PhraseIntent:
         """
         Rule-based intent detection from score markings.
-
-        Priority order (highest specificity first):
-          BRILLIANT > STACCATO > CANTABILE > LEGATO > EXPRESSIVE
+        Priority: BRILLIANT > STACCATO > CANTABILE > LEGATO > EXPRESSIVE
         """
         notes = phrase.notes
         if not notes:
             return PhraseIntent.EXPRESSIVE
 
-        # Note density (notes per beat)
         duration = max(phrase.duration_beats, 0.01)
         density = len(notes) / duration
+        dyn_rank = _dynamic_rank(notes[0].dynamic)
+        staccato_ratio = sum(1 for n in notes if n.is_staccato) / len(notes)
+        slur_ratio = sum(1 for n in notes if n.in_slur) / len(notes)
 
-        # Representative dynamic (use first note's as proxy)
-        dyn = notes[0].dynamic
-        dyn_rank = _dynamic_rank(dyn)
-
-        # Check staccato
-        staccato_count = sum(1 for n in notes if n.is_staccato)
-        staccato_ratio = staccato_count / len(notes)
-
-        # Check slur coverage
-        slur_count = sum(1 for n in notes if n.in_slur)
-        slur_ratio = slur_count / len(notes)
-
-        # BRILLIANT: fast + loud
-        if density >= _BRILLIANT_DENSITY and dyn_rank >= 6:  # f or louder
+        if density >= _BRILLIANT_DENSITY and dyn_rank >= 6:
             return PhraseIntent.BRILLIANT
-
-        # STACCATO: majority of notes are staccato
         if staccato_ratio >= 0.5:
             return PhraseIntent.STACCATO
-
-        # CANTABILE: slurred + soft dynamic (singing quality)
-        if slur_ratio >= 0.6 and dyn_rank <= 5:  # up to mf
+        if slur_ratio >= 0.6 and dyn_rank <= 5:
             return PhraseIntent.CANTABILE
-
-        # LEGATO: slurred but not specifically soft
         if slur_ratio >= 0.4:
             return PhraseIntent.LEGATO
-
         return PhraseIntent.EXPRESSIVE
 
     def _find_climax(self, phrase: Phrase) -> int:
         """
-        Find the climax note index — the peak of musical tension.
-
-        Primary criterion: highest pitch.
-        Tiebreaker: accent mark, then later position (climax tends late).
+        Find the climax note index — peak of musical tension.
+        Primary: highest pitch. Tiebreaker: accent > later position.
         """
         notes = phrase.notes
         if not notes:
             return 0
-
-        # Score each note for "climax-ness"
         max_pitch = max(n.pitch for n in notes)
-        candidates = [
-            i for i, n in enumerate(notes) if n.pitch == max_pitch
-        ]
-
-        # Prefer accented note among ties
+        candidates = [i for i, n in enumerate(notes) if n.pitch == max_pitch]
         accented = [i for i in candidates if notes[i].has_accent]
-        if accented:
-            return accented[0]
-
-        # Prefer the later occurrence (climax tends toward phrase end)
-        return candidates[-1]
+        return accented[0] if accented else candidates[-1]
 
     def _compute_tension(self, phrase: Phrase) -> List[float]:
         """
-        Compute a per-note tension curve [0.0 → 1.0].
+        Compute per-note tension curve [0.0 → 1.0].
 
-        Shape depends on ArcType:
-          ARCH  → rises to climax, then falls
-          CLIMB → monotonically rises
-          FALL  → monotonically falls
-          WAVE  → sinusoidal approximation
-          FLAT  → constant 0.5
+        Blends:
+          70% shape curve  (ARCH / CLIMB / FALL / WAVE / FLAT)
+          30% dissonance   (T2-B: tritone=1.0, perfect 5th=0.1, etc.)
 
-        This curve is used by the phrase-scoped DP to:
-          - Anticipate the climax (pre-climax: build tension)
-          - Align finger order with melodic direction
-          - Assign strong fingers near the climax
+        This makes fingering stronger at genuinely dissonant moments,
+        not just at pitch peaks — matching how a pianist feels tension.
         """
         n = len(phrase.notes)
         if n == 0:
@@ -142,8 +132,10 @@ class PhraseIntentAnalyzer:
 
         arc = phrase.arc_type
         climax = phrase.climax_idx
-        curve = []
+        notes = phrase.notes
 
+        # Shape curve
+        shape = []
         for i in range(n):
             if arc == ArcType.ARCH:
                 if climax == 0:
@@ -152,20 +144,19 @@ class PhraseIntentAnalyzer:
                     t = i / climax
                 else:
                     t = 1.0 - (i - climax) / max(n - 1 - climax, 1)
-
             elif arc == ArcType.CLIMB:
                 t = i / (n - 1)
-
             elif arc == ArcType.FALL:
                 t = 1.0 - i / (n - 1)
-
             elif arc == ArcType.WAVE:
-                import math
                 t = 0.5 + 0.5 * math.sin(2 * math.pi * i / max(n - 1, 1))
-
-            else:  # FLAT
+            else:
                 t = 0.5
+            shape.append(t)
 
-            curve.append(round(t, 3))
+        # T2-B: Dissonance curve
+        diss = [0.5]  # first note has no prior interval
+        for i in range(1, n):
+            diss.append(_dissonance_of_interval(notes[i].pitch - notes[i - 1].pitch))
 
-        return curve
+        return [round(0.70 * s + 0.30 * d, 3) for s, d in zip(shape, diss)]

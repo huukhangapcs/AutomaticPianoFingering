@@ -64,6 +64,7 @@ class PhraseSelector:
             return []
 
         cfg = self.config
+        tonic_pc = score_profile.tonic_pc  # T1-B: tonic awareness
 
         # --- Step 1: Force boundaries at SECTION TRANSITIONS ---
         # A pianist ends a phrase where one section ends and another begins.
@@ -75,6 +76,26 @@ class PhraseSelector:
             # Also force start-of-section for the first occurrence (not repeats)
             if not s.is_repeat:
                 forced_measures.add(s.start_measure)
+
+        # --- T1-A: Harmonic rhythm fallback ---
+        # When a large passage has no motif-based section boundaries,
+        # use chord changes to create soft boundaries every N measures.
+        # This handles B-sections and development material without recurring motifs.
+        hr_boundaries: Set[int] = set()
+        if harmonic.harmonic_rhythm > 0:
+            chord_changes = harmonic.chord_changes()  # measure numbers
+            chord_per_phrase = max(2, round(4 / max(0.5, harmonic.harmonic_rhythm)))
+            # Group chord changes: fire boundary after every `chord_per_phrase` changes
+            change_count = 0
+            last_hr_boundary = notes[0].measure if notes else 0
+            for change_m in chord_changes:
+                change_count += 1
+                if change_count >= chord_per_phrase:
+                    gap = change_m - last_hr_boundary
+                    if gap >= cfg.min_phrase_measures:
+                        hr_boundaries.add(change_m)
+                        last_hr_boundary = change_m
+                        change_count = 0
 
         # --- Step 2: Evaluate bottom-up candidates ---
         # For each candidate, compute an enhanced score using cadence evidence
@@ -89,7 +110,6 @@ class PhraseSelector:
             measure = note.measure
 
             # Skip if within min_phrase_measures of a forced boundary
-            # (avoids tiny splinters between forced + confirmed boundaries)
             in_forced_zone = any(
                 abs(measure - fm) < cfg.min_phrase_measures
                 for fm in forced_measures
@@ -99,24 +119,33 @@ class PhraseSelector:
 
             # Check for nearby cadence to boost confidence
             cadence = harmonic.cadence_at(measure, cfg.cadence_alignment_tolerance)
-            cadence_boost = cadence.strength * 0.20 if cadence else 0.0
+            cadence_boost = 0.0
+            if cadence:
+                cadence_boost = cadence.strength * 0.20
+                # T1-B: tonic arrival bonus
+                arrival_pc = note.pitch % 12
+                if arrival_pc == tonic_pc:
+                    cadence_boost = min(0.4, cadence_boost + 0.25)
+                elif arrival_pc == (tonic_pc + 7) % 12:  # dominant
+                    cadence_boost = min(0.4, cadence_boost + 0.10)
+
             enhanced_score = min(1.0, base_score + cadence_boost)
 
             if in_forced_zone:
-                continue   # Don't clutter near section boundaries
+                continue
 
             if enhanced_score >= cfg.confirm_threshold:
                 confirmed_indices.add(idx)
             elif cadence and enhanced_score >= cfg.weak_threshold:
                 weak_indices.add(idx)
 
-        # --- Step 3: Convert forced measures to note indices ---
+        # --- Step 3: Convert forced-measure + HR boundaries → note indices ---
+        all_forced_measures = forced_measures | hr_boundaries
         forced_indices: Set[int] = set()
         for i, note in enumerate(notes):
-            if note.measure in forced_measures and (
-                i == 0 or notes[i - 1].measure not in forced_measures
+            if note.measure in all_forced_measures and (
+                i == 0 or notes[i - 1].measure not in all_forced_measures
             ):
-                # First note of the forced measure = boundary predecessor
                 if i > 0:
                     forced_indices.add(i - 1)
 
