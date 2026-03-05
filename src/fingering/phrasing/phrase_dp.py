@@ -265,10 +265,8 @@ class PhraseScopedDP:
             if intent not in (PhraseIntent.LEGATO, PhraseIntent.CANTABILE):
                 cost += REPEATED_THUMB_PENALTY
 
-        # ── Ergonomic: physical span (mm) + Lazy First Principle ──────────────
+        # ── Ergonomic: physical span (mm) stretch cost ───────────────────
         # Use physical key positions in mm (keyboard.py physical model).
-        # Black key non-uniformity is already captured in _PC_TO_MM_OFFSET,
-        # so no separate black_key_span_correction needed here.
         span_mm = physical_span_mm(note_prev, note_curr)
         max_mm  = finger_max_span_mm(f_prev, f_curr)
 
@@ -281,27 +279,37 @@ class PhraseScopedDP:
 
         over_mm = max(0.0, span_mm - max_mm)
 
-        if span > LARGE_LEAP_THRESHOLD:
-            # Large leap: pianist repositions hand. Fixed cost + anchor guidance.
-            cost += LARGE_LEAP_REPOSITION_COST
-            if ascending and f_curr in (3, 4, 5):
-                cost += LARGE_LEAP_ANCHOR_REWARD
-            elif not ascending and f_curr in (1, 2):
-                cost += LARGE_LEAP_ANCHOR_REWARD
-        else:
-            # Normal range: quadratic stretch penalty in mm domain
-            # 20mm over → 20² × 0.003 = 1.2 cost  (1 octave = 164.5mm)
-            cost += over_mm ** 2 * 0.003
-
-            # Lazy First Principle — in-position reward:
-            # If the note is reachable without any hand shift, reward.
-            if over_mm == 0.0 and span_mm > 0:
-                cost += IN_POSITION_REWARD  # no stretch → hand stays put
-
-        # ── Phase 3B: Hand position shift cost ───────────────────────────
-        # Penalises large hand repositioning (pianist avoids unnecessary shifts).
+        # ── HandState: infer full hand position from (note, finger) ──────
+        # v2: uses thumb_mm (physical anchor) — correctly handles in-position
+        # jumps like E5(f1)→A5(f4) where thumb never moves.
         pos_prev = _hand_tracker.infer(note_prev, f_prev)
         pos_curr = _hand_tracker.infer(note_curr, f_curr)
+
+        # ── Lazy First Principle ──────────────────────────────────────────
+        # Check via HandState.is_in_position(): does the curr note fall
+        # under finger f_curr given the prev hand position?  If yes → free.
+        in_position = pos_prev.is_in_position(note_curr, f_curr)
+
+        if in_position:
+            # Hand doesn't move — strong reward for staying put.
+            cost += IN_POSITION_REWARD
+        else:
+            # Hand must reposition.  Two sub-cases:
+            if span > LARGE_LEAP_THRESHOLD:
+                # Large leap: pianist repositions hand. Fixed cost + anchor guidance.
+                cost += LARGE_LEAP_REPOSITION_COST
+                if ascending and f_curr in (3, 4, 5):
+                    cost += LARGE_LEAP_ANCHOR_REWARD
+                elif not ascending and f_curr in (1, 2):
+                    cost += LARGE_LEAP_ANCHOR_REWARD
+            else:
+                # Small reposition: quadratic stretch penalty in mm domain.
+                # 20mm over → 20² × 0.003 = 1.2 cost  (1 octave = 164.5mm)
+                cost += over_mm ** 2 * 0.003
+
+        # ── Phase 3B: Hand position shift cost ───────────────────────────
+        # Additional cost for the physical distance the thumb must travel.
+        # v2: uses thumb_mm delta — zero for same-position jumps.
         cost += _hand_tracker.shift_cost(pos_prev, pos_curr)
 
         # ── Phase 4: Melodic-direction / finger-direction alignment ──────────
