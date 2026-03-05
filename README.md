@@ -15,7 +15,7 @@ Hệ thống này mô phỏng đúng quy trình đó thay vì tối ưu ergonomi
 
 ---
 
-## 🏗️ Kiến trúc (Phase 2.5 — Phrase Segmentation v2 + Biomechanics)
+## 🏗️ Kiến trúc (Phase 2.6 — Physical Keyboard Model + Lazy First Principle)
 
 ```
 MusicXML File
@@ -109,7 +109,7 @@ AutomaticPianoFingering/
 │   ├── models/
 │   │   └── note_event.py           # NoteEvent data model + keyboard geometry
 │   ├── core/
-│   │   └── keyboard.py             # Span limits, biomechanics helpers [v2]
+│   │   └── keyboard.py             # Physical key positions (mm), anthropometric span [v3]
 │   ├── io/
 │   │   └── musicxml_reader.py      # MusicXML parser (grand staff + key sig)
 │   └── phrasing/
@@ -119,7 +119,8 @@ AutomaticPianoFingering/
 │       ├── scale_fingering.py      # 12-tone scale fingering database [NEW]
 │       ├── pattern_library.py      # Tone-specific scale + Hanon + arpeggio [v2]
 │       ├── intent_analyzer.py      # Intent + tension curve
-│       ├── phrase_dp.py            # Viterbi DP + biomechanics costs [v2]
+│       ├── phrase_dp.py            # Viterbi DP + Lazy First Principle + physical span [v3]
+│       ├── hand_position.py        # Hand position tracking + quadratic inertia cost [NEW]
 │       ├── chord_heuristic.py      # Chord fingering: 1-3-5 / 5-3-1
 │       ├── cross_phrase.py         # Cross-phrase stitch (Layer D)
 │       ├── fingering_auditor.py    # Post-DP validation + auto-repair [NEW]
@@ -131,7 +132,7 @@ AutomaticPianoFingering/
 │       └── pipeline.py             # Main orchestrator (PhraseAwareFingering)
 ├── tests/
 │   └── phrasing/
-│       └── test_phrase_aware.py    # 35 unit tests (7 test classes)
+│       └── test_phrase_aware.py    # 43 unit tests (7 test classes)
 ├── scripts/
 │   ├── demo_musicxml.py            # Single-staff demo + GT comparison
 │   ├── demo_grand_staff.py         # Grand staff demo (RH + LH separately)
@@ -149,7 +150,7 @@ AutomaticPianoFingering/
 
 ```bash
 python -m pytest tests/ -q
-# 35 passed in 0.07s ✅
+# 43 passed in 0.07s ✅
 ```
 
 ### Match rate vs. PIG dataset (Ground Truth annotations)
@@ -165,7 +166,9 @@ Benchmark trên 20 file đầu tiên của **PIG Piano Fingering Dataset v1.2** 
 | + Thumb-Under/Finger-Over rewards | 31.91% | 32.16% |
 | + Biomechanics (tendon + tempo) | 32.11% | 32.44% |
 | + Finger-4 penalty + Black key long finger | 35.47% | 35.66% |
-| **+ Lookahead stitch + Phrase-final lengthening** | **35.54%** | **35.73%** |
+| + Lookahead stitch + Phrase-final lengthening | 35.54% | 35.73% |
+| + Large leap reposition + Sequential stepwise reward | 37.12% | 37.38% |
+| **+ Physical Keyboard Model + Lazy First Principle** | **38.00%** | **38.21%** |
 
 > **Note:** GT annotations reflect personal stylistic preferences. The same piece fingered by different professional pianists differs 30–40%, so ~32% match against a single annotator's style is realistic for a rule-based system.
 
@@ -244,11 +247,19 @@ python scripts/error_analysis.py 20
 | `keyboard.py` | Tendon coupling, black key depth, tempo-aware span |
 | `fingering_auditor.py` | 9-rule post-DP auditor + auto-repair |
 | `error_analysis.py` | Error categorizer (9 types + confusion matrix) |
-| Tests | 43 unit tests pass |
+
+### ✅ Phase 2.6 — Hoàn thành
+
+| Module | Mô tả |
+|--------|-------|
+| `keyboard.py` [v3] | `physical_key_position_mm()` — vị trí thực (mm) theo Steinway layout; `MAX_SPAN_MM` anthropometry (Li et al. 2016); `physical_span_mm()`, `finger_max_span_mm()`, `is_in_hand_position()` |
+| `phrase_dp.py` [v3] | **Lazy First Principle** — `IN_POSITION_REWARD = -1.5` thưởng note trong tầm tay; stretch cost chuyển sang mm domain (`over_mm² × 0.003`) |
+| `hand_position.py` [v3] | Quadratic inertia: linear `0.3x` → `0.5x·excess²` — 10-semitone shift: penalty ×12 (2.1 → 24.5) |
+| Tests | **43 unit tests** pass |
 
 ### 🚧 Phase 3 — Tiếp theo (Neural)
 
-Rule-based engine đã đạt **trần hiệu suất ~32%**. Bước tiếp theo yêu cầu neural model để vượt ngưỡng này.
+Rule-based engine đã đạt **trần hiệu suất ~38%**. Bước tiếp theo yêu cầu neural model để vượt ngưỡng này.
 
 | Priority | Việc cần làm | Mục tiêu |
 |----------|-------------|----------|
@@ -281,6 +292,8 @@ Rule-based engine đã đạt **trần hiệu suất ~32%**. Bước tiếp theo
 | Chord fingering | C-E-G LH → 5-3-1 | ✅ ChordHeuristic |
 | Cross-phrase planning | Ngón cuối A → đầu B | ✅ CrossPhraseStitch |
 | Kiểm tra lỗi | "Ngón này không thể" | ✅ FingeredAuditor |
+| Vị trí phím thực (mm) | Steinway layout, anthropometry | ✅ Physical Keyboard Model |
+| Ưu tiên giữ tầm tay | Lazy First Principle — ít di chuyển | ✅ IN_POSITION_REWARD |
 | Học từ data | Điều chỉnh phong cách | 🚧 Phase 3 — Neural Model |
 
 ---
