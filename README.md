@@ -15,7 +15,7 @@ Hệ thống này mô phỏng đúng quy trình đó thay vì tối ưu ergonomi
 
 ---
 
-## 🏗️ Kiến trúc (Phase 2.7 — Full Hand State Model)
+## 🏗️ Kiến trúc (Phase 2.8 — Position Planner)
 
 ```
 MusicXML File
@@ -169,7 +169,8 @@ Benchmark trên 20 file đầu tiên của **PIG Piano Fingering Dataset v1.2** 
 | + Lookahead stitch + Phrase-final lengthening | 35.54% | 35.73% |
 | + Large leap reposition + Sequential stepwise reward | 37.12% | 37.38% |
 | + Physical Keyboard Model + Lazy First Principle | 38.00% | 38.21% |
-| **+ Full Hand State Model (thumb_mm)** | **44.00%** | **43.74%** |
+| + Full Hand State Model (thumb_mm) | 44.00% | 43.74% |
+| **+ Position Planner pre-pass** | **45.76%** | **45.90%** |
 
 > **Note:** GT annotations reflect personal stylistic preferences. The same piece fingered by different professional pianists differs 30–40%, so ~32% match against a single annotator's style is realistic for a rule-based system.
 
@@ -261,13 +262,21 @@ python scripts/error_analysis.py 20
 
 | Module | Mô tả |
 |--------|-------|
-| `hand_position.py` [v4] | `HandState` dataclass: `thumb_mm` = toạ độ mm của ngón cái; `infer(note,f)` tính thumb_mm thực; `is_in_position()` check 5-finger coverage |
-| `phrase_dp.py` [v4] | Dùng `HandState.is_in_position()` cho Lazy First Principle; shift_cost v2 dùng thumb_mm delta (không còn so sánh MIDI pitch) |
-| Tests | **51 unit tests** pass (+ 8 HandState tests mới) |
+| `hand_position.py` [v4] | `HandState` dataclass: `thumb_mm`; `infer(note,f)`; `is_in_position()` |
+| `phrase_dp.py` [v4] | `HandState.is_in_position()` cho Lazy First Principle |
+| Tests | 51 unit tests pass |
+
+### ✅ Phase 2.8 — Hoàn thành
+
+| Module | Mô tả |
+|--------|-------|
+| `position_planner.py` [NEW] | Greedy sliding-window (4–8 notes) → anchor `thumb_mm` per note |
+| `phrase_dp.py` [v5] | `POSITION_ANCHOR_REWARD = -2.0` tích lũy qua cả phrase; stable positions "sticky" |
+| Fix | m10 G5 = f3 ✅ (was f2) |
 
 ### 🚧 Phase 3 — Tiếp theo (Neural)
 
-Rule-based engine đã đạt **trần hiệu suất ~44%**. Bước tiếp theo yêu cầu neural model để vượt ngưỡng này.
+Rule-based engine đã đạt **trần hiệu suất ~46%**. Bước tiếp theo yêu cầu neural model để vượt ngưỡng này.
 
 | Priority | Việc cần làm | Mục tiêu |
 |----------|-------------|----------|
@@ -303,6 +312,7 @@ Rule-based engine đã đạt **trần hiệu suất ~44%**. Bước tiếp theo
 | Vị trí phím thực (mm) | Steinway layout, anthropometry | ✅ Physical Keyboard Model |
 | Ưu tiên giữ tầm tay | Lazy First Principle — ít di chuyển | ✅ IN_POSITION_REWARD |
 | Aware từng ngón ở đâu | 5 ngón = 5 toạ độ mm từ thumb_mm | ✅ HandState model |
+| Lên kế hand position | Sliding-window anchor planning trước DP | ✅ Position Planner |
 | Học từ data | Điều chỉnh phong cách | 🚧 Phase 3 — Neural Model |
 
 ---
