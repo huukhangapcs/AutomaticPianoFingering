@@ -1,2 +1,0 @@
-id, start_measure, end_measure
-1, 5, 10

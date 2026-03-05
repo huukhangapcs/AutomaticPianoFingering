@@ -15,52 +15,80 @@ Hệ thống này mô phỏng đúng quy trình đó thay vì tối ưu ergonomi
 
 ---
 
-## 🏗️ Kiến trúc
+## 🏗️ Kiến trúc (Phase 2.5 — Phrase Segmentation v2 + Biomechanics)
 
 ```
 MusicXML File
      │
      ▼
-┌─────────────────────────────────────────────────────┐
-│  IO Layer: MusicXMLReader                           │
-│  • Grand staff support (staff 1=RH, staff 2=LH)     │
-│  • Per-staff time tracking với <backup> elements     │
-│  • Slur, staccato, accent, fingering GT parsing     │
-└───────────────────┬─────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│  IO Layer: MusicXMLReader                                   │
+│  • Grand staff support (staff 1=RH, staff 2=LH)            │
+│  • Per-staff time tracking với <backup> elements            │
+│  • Slur, staccato, accent, fingering GT parsing             │
+│  • Key signature → tonic_pc (12 keys)                       │
+└───────────────────┬─────────────────────────────────────────┘
                     │ List[NoteEvent]
                     ▼
-┌─────────────────────────────────────────────────────┐
-│  Phrase-Aware Fingering Pipeline (PAF)              │
-│                                                     │
-│  Layer A: PhraseBoundaryDetector                    │
-│    • Signal fusion (slur, rest, cadence, dynamic)   │
-│    • [Imp 1] Melodic Arc Detector (ARCH/CLIMB/FALL) │
-│    • [Imp 2] Metric Position Weighting (downbeat)   │
-│    • [Imp 3] Phrase Length Prior (2/4/8 measures)   │
-│    • [Imp 4] Melodic Leap Compensation (>= P4)      │
-│    • [Fix 1] Forced segmentation (max 4 measures)   │
-│                                                     │
-│  Layer B: PhraseIntentAnalyzer                      │
-│    • CANTABILE / BRILLIANT / LEGATO / STACCATO      │
-│    • Tension curve + climax note detection          │
-│                                                     │
-│  Layer C: PhraseScopedDP (Viterbi)                  │
-│    • Ergonomic cost: span, crossing, black keys     │
-│    • [Fix 2] Pattern Library injection              │
-│        – Major/minor scale → 1-2-3-1-2-3-4-5       │
-│        – Partial scale (4+ notes) detection         │
-│        – Broken chord arpeggio → 1-2-4 / 5-3-1     │
-│    • [Fix 3] Chord Heuristic (simultaneous notes)   │
-│        – RH chord [low→high] → [1, 3, 5]           │
-│        – LH chord [low→high] → [5, 3, 1]           │
-│    • LH-aware crossing & direction flip             │
-│    • Intent modifiers (LEGATO subst / BRILLIANT amp)│
-│    • Climax note → strong fingers (2, 3)            │
-│                                                     │
-│  Layer D: CrossPhraseStitch                         │
-│    • Junction constraint (phòng clashing)           │
-│    • Preferred end finger for smooth transition     │
-└───────────────────┬─────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│  RECOGNITION LAYERS (top-down + bottom-up)                  │
+│                                                             │
+│  Layer 0: ScoreProfile — texture, key, markings (global)   │
+│                                                             │
+│  Layer 1: Voice Separation [v2]                             │
+│    • Trích xuất Melody Stream (nốt cao nhất mỗi onset)     │
+│    • Tránh nhiễu hợp âm đệm khi phân tích phrase           │
+│                                                             │
+│  Layer 2: PhraseBoundaryDetector [v2 — Logit/Sigmoid]       │
+│    • 8 signals: slur, rest, cadence, agogic, melodic arc   │
+│    • Melodic Leap Compensation (≥ P4 + stepwise resolve)    │
+│    • Boundary probability P ∈ (0,1) — không còn threshold  │
+│                                                             │
+│  Layer 3: Global Segmentation — Viterbi DP [v2]             │
+│    • Tối ưu toàn cục: max Σ P(boundary) × Prior(length)    │
+│    • Phrase length prior: Gaussian μ=4, σ=2 measures        │
+│    • Constraint: 2 ≤ length ≤ 12 measures                  │
+│    • LH: segment by measure, RH: full phrase pipeline       │
+│                                                             │
+│  Layer 3b: MotifEngine + PhraseSelector (top-down)          │
+│  Layer 3c: HarmonicSkeleton + PeriodDetector               │
+└───────────────────┬─────────────────────────────────────────┘
+                    │ List[Phrase]
+                    ▼
+┌─────────────────────────────────────────────────────────────┐
+│  FINGERING LAYERS                                           │
+│                                                             │
+│  Layer A: Pattern Library [v2 — tone-specific]              │
+│    • 12-tone scale fingering database (all major/minor)     │
+│        C major: 1-2-3-1-2-3-4-5                             │
+│        Bb major: 4-1-2-3-1-2-3-4 (Bb = black key start)   │
+│        F# major: 2-3-4-1-2-3-4-5 (F# = black key root)    │
+│    • Hanon 5-finger patterns (5-9 nốt liền bậc < 1 octave)│
+│    • Arpeggio broken chord: 1-2-4 / 5-3-1                  │
+│    • Partial scale (4-7 nốt)                                │
+│                                                             │
+│  Layer B: PhraseIntentAnalyzer                              │
+│    • CANTABILE / BRILLIANT / LEGATO / STACCATO / EXPRESSIVE │
+│    • Tension curve + climax note detection                  │
+│                                                             │
+│  Layer C: PhraseScopedDP — Viterbi [v2 + Biomechanics]     │
+│    • Ergonomic cost: span, crossing, black keys             │
+│    • Thumb-Under reward: -1.5 khi đúng ngữ cảnh scale      │
+│    • Finger-Over reward: -1.2 khi đúng ngữ cảnh descending │
+│    • Biomechanics — Tendon Coupling (3-4, 4-5) at tempo    │
+│    • Biomechanics — Black key depth span correction        │
+│    • Biomechanics — Tempo-aware max_span (Presto → compact)│
+│    • Intent modifiers (LEGATO subst / BRILLIANT amplify)   │
+│    • Climax note → strong fingers (2, 3)                    │
+│    • Chord heuristic: RH [1,3,5], LH [5,3,1]              │
+│                                                             │
+│  Layer D: CrossPhraseStitch                                 │
+│    • Junction constraint, preferred end finger look-ahead  │
+│                                                             │
+│  Layer E: FingeredAuditor [NEW]                             │
+│    • 9 rules (HARD_VIOLATION + WARNING)                     │
+│    • Auto-repair HARD violations via local greedy search    │
+└───────────────────┬─────────────────────────────────────────┘
                     │ List[int] (finger 1–5 per note)
                     ▼
               Fingering Output
@@ -74,29 +102,40 @@ MusicXML File
 AutomaticPianoFingering/
 ├── src/fingering/
 │   ├── models/
-│   │   └── note_event.py          # NoteEvent data model + keyboard geometry
+│   │   └── note_event.py           # NoteEvent data model + keyboard geometry
 │   ├── core/
-│   │   └── keyboard.py            # Span limits, white-key index, LH/RH helpers
+│   │   └── keyboard.py             # Span limits, biomechanics helpers [v2]
 │   ├── io/
-│   │   └── musicxml_reader.py     # MusicXML parser (grand staff aware)
+│   │   └── musicxml_reader.py      # MusicXML parser (grand staff + key sig)
 │   └── phrasing/
-│       ├── phrase.py              # Phrase dataclass, PhraseIntent, ArcType enums
-│       ├── boundary_detector.py   # Layer A — 3 improvements + forced segmentation
-│       ├── intent_analyzer.py     # Layer B — intent + tension curve
-│       ├── phrase_dp.py           # Layer C — Viterbi DP (LH/RH aware)
-│       ├── pattern_library.py     # Pattern detection: scale, arpeggio
-│       ├── chord_heuristic.py     # Chord fingering: 1-3-5 / 5-3-1
-│       ├── cross_phrase.py        # Layer D — cross-phrase stitch
-│       └── pipeline.py            # Main orchestrator (PhraseAwareFingering)
+│       ├── phrase.py               # Phrase dataclass, PhraseIntent, ArcType
+│       ├── boundary_detector.py    # Boundary signals + Viterbi segmentation [v2]
+│       ├── voice_separation.py     # Melody stream extraction [v2 NEW]
+│       ├── scale_fingering.py      # 12-tone scale fingering database [NEW]
+│       ├── pattern_library.py      # Tone-specific scale + Hanon + arpeggio [v2]
+│       ├── intent_analyzer.py      # Intent + tension curve
+│       ├── phrase_dp.py            # Viterbi DP + biomechanics costs [v2]
+│       ├── chord_heuristic.py      # Chord fingering: 1-3-5 / 5-3-1
+│       ├── cross_phrase.py         # Cross-phrase stitch (Layer D)
+│       ├── fingering_auditor.py    # Post-DP validation + auto-repair [NEW]
+│       ├── harmonic_skeleton.py    # Cadence detection
+│       ├── motif_engine.py         # A-B-A form detection
+│       ├── period_detector.py      # Antecedent/consequent labeling
+│       ├── phrase_selector.py      # Merge top-down + bottom-up signals
+│       ├── score_profile.py        # Global texture + key profile
+│       └── pipeline.py             # Main orchestrator (PhraseAwareFingering)
 ├── tests/
 │   └── phrasing/
-│       └── test_phrase_aware.py   # 34 unit tests (7 test classes)
+│       └── test_phrase_aware.py    # 35 unit tests (7 test classes)
 ├── scripts/
-│   ├── demo_musicxml.py           # Single-staff demo + GT comparison
-│   └── demo_grand_staff.py        # Grand staff demo (RH + LH separately)
+│   ├── demo_musicxml.py            # Single-staff demo + GT comparison
+│   ├── demo_grand_staff.py         # Grand staff demo (RH + LH separately)
+│   ├── pig_eval.py                 # PIG dataset benchmark (match rate)
+│   ├── audit_fingering.py          # Violation audit per phrase [NEW]
+│   └── error_analysis.py           # Error categorization by type [NEW]
 └── test_file/
-    ├── cW8VLC9nnTo.musicxml       # Single-staff test (166 notes)
-    └── FN7ALfpGxiI.musicxml       # Grand staff test (1273 notes, 199 measures)
+    ├── cW8VLC9nnTo.musicxml        # Single-staff test (166 notes)
+    └── FN7ALfpGxiI.musicxml        # Grand staff test (Für Elise, 199 measures)
 ```
 
 ---
@@ -105,49 +144,37 @@ AutomaticPianoFingering/
 
 ```bash
 python -m pytest tests/ -q
-# 34 passed in 0.08s ✅
+# 35 passed in 0.07s ✅
 ```
 
-### Match rate vs. ground truth annotations
+### Match rate vs. PIG dataset (Ground Truth annotations)
 
-Tested on `FN7ALfpGxiI.musicxml` (grand staff, 199 measures):
+Benchmark trên 20 file đầu tiên của **PIG Piano Fingering Dataset v1.2** (Right Hand only):
 
-| Hand | Notes | GT Annotated | Match Rate |
-|------|-------|:------------:|:----------:|
-| Right Hand | 524 | 433 | **28.9%** |
-| Left Hand  | 496 | 146 | **28.8%** (↑ từ 27.4%) |
+| Version | Overall Match Rate | Average File Acc |
+|---|:---:|:---:|
+| Greedy threshold (baseline) | 28.9% | — |
+| Viterbi DP (phase 2) | 30.59% | — |
+| + Voice Separation | 30.53% | 30.75% |
+| + Tone-specific Scale + Hanon | 31.91% | 32.16% |
+| + Thumb-Under/Finger-Over rewards | 31.91% | 32.16% |
+| **+ Biomechanics (tendon + tempo)** | **32.11%** | **32.44%** |
 
-> **Note:** GT annotations cover ~55% of total notes. Many mismatches reflect
-> personal stylistic preferences (the same piece fingered by different pianists
-> often differs 30–40% even among professionals).
+> **Note:** GT annotations reflect personal stylistic preferences. The same piece fingered by different professional pianists differs 30–40%, so ~32% match against a single annotator's style is realistic for a rule-based system.
 
-### 🧩 Phân tích thuật toán Cắt Segment (Phrase Segmentation)
+### 🔬 Error Analysis (3,089 wrong predictions)
 
-Thuật toán cắt Segment hiện tại được thiết kế theo tư duy **nhìn trước cấu trúc** của pianist, vượt qua giới hạn của các thuật toán greedy thông thường. Cuộc kiểm thử thuật toán trên bản nhạc phức tạp (Für Elise) cho điểm số **9/10** về mức độ tương đồng với nhận thức con người:
+| Error Category | Count | % of Total Errors |
+|---|:---:|:---:|
+| **THUMB_MISS** | 1,478 | **47.8%** |
+| **OFF_BY_ONE** | 901 | **29.2%** |
+| SCALE_ERROR | 363 | 11.8% |
+| CHORD_ERROR | 251 | 8.1% |
+| LARGE_JUMP | 61 | 2.0% |
+| BLACK_KEY | 17 | 0.6% |
+| OTHER | 18 | 0.6% |
 
-1. **Phân bổ "Chunking" theo chuẩn cổ điển:** Não bộ pianist thường nhóm thông tin theo cụm 4, 8, hoặc 16 ô nhịp. Hệ thống đã đồng bộ hóa `max_phrase_measures=12` và phát hiện ra **gần 50% số phrases rơi đúng vào độ dài chuẩn (4m, 8m)** với chiều dài trung bình `5.8m` – mức độ hoàn hảo cho khả năng "sight-reading ahead".
-2. **Cấu trúc Hỏi - Đáp (Question & Answer):** Hệ thống tích hợp `PeriodDetector` dựa trên hệ quả Harmonic Skeleton (nhận dạng Cadence V-I hoặc I-V). Nhờ đó, nó tự động dán nhãn các phrases nối tiếp nhau thành cặp **Antecedent (Câu hỏi)** và **Consequent (Câu trả lời)**, ví dụ từ phân tích Für Elise: `P1 (antecedent) -> P2 (consequent)`.
-3. **Phân tích Multi-Layer Constraint:**
-   - *Top-down:* `MotifEngine` (tìm form A-B-A ở cấp độ 8, 12, 16 notes).
-   - *Bottom-up:* `PhraseBoundaryDetector` (tìm các tín hiệu rests, slurs, khoảng cách nốt, melodic leap).
-   - *Harmonic:* `ScoreProfile` tự động đọc `<key>` MusicXML để xác định đúng Tonic, hỗ trợ detect Harmony.
-4. **Xử lý Pedal Point Khó:** Hệ thống giữ lại được các *dominant pedal point* dài (ví dụ đoạn lặp bass trống dồn dập 24 ô nhịp trước khi về chủ đề A trong Für Elise), chứng tỏ tính linh hoạt không cắt mù quáng khi đoạn nhạc chưa "giải quyết" (resolve) về mặt hòa âm.
-
-### 🧩 Phân tích Giới hạn của Rule-based Engine (Kết thúc Phase 2)
-
-Sau khi hoàn thành toàn bộ Phase 2 (Pianist Cognitive Engine) bao gồm **Phrase-Aware DP**, **Chord Heuristics**, và **Pattern Library** (Scale/Arpeggio detect), hệ thống được đưa vào benchmark trên file test của tập dữ liệu chuyên gia PIG (Piano Fingering Dataset).
-
-Kết quả ghi nhận một hiện tượng vô cùng thú vị ("Pattern Library Paradox"):
-- **Chỉ chạy Viterbi DP thuần túy:** Khớp `31.47%` với Ground Truth của chuyên gia.
-- **Bật thêm Pattern Library (Ép ngón theo chuẩn Scale/Arpeggio):** Khớp `30.59%` (Giảm nhẹ).
-
-**Tại sao rules cứng nhắc lại làm giảm độ chính xác? (RH)**
-1. **Bối cảnh (Context) quan trọng hơn Khuôn mẫu (Pattern):** Khi ép một chuỗi nốt chạy lên (scalar run) theo pattern cố định `1-2-3-4-5`, rule này có thể vô tình ép ngón cái (ngón 1) rơi vào một phím đen rải rác bên trong thang âm. Thuật toán Viterbi DP tự nhiên (khi không bị ép) đủ thông minh để lách ngón cái khỏi phím đen bằng cách trượt ngón `3-4` dài hơn, tạo ra đường tiếng mượt mà hơn. Khi bị hard-code đè lên, nó vỡ form.
-
-*✅ (Đã Fix) Sự bất cân xứng T/P: Thuật toán nay đã tách biệt Hand-Specific logic (RH=Phrase, LH=Measure).*
-
-**Kết luận Phase 2:**
-Tư duy dùng Rule gò ép (Symbolic logic) đã chạm mức trần sinh học của nó. Máy tính tính toán Ergonomics matrix còn chuẩn xác hơn cả Rule do con người viết ra. Việc giải quyết các case luồn ngón cái phức tạp đòi hỏi sự uyển chuyển của **Mạng Nơ-ron (Deep Learning)**. Đây là tiền đề hoàn hảo để hệ thống tiến thẳng vào **Phase 3: Hybrid Neuro-Symbolic (BI-LSTM + CRF)**.
+**Top confusions:** f3→f2 (417x), f2→f1 (362x), f1→f2 (310x) — hệ thống đang thiên vị ngón 1-2.
 
 ---
 
@@ -166,72 +193,79 @@ from fingering.io.musicxml_reader import MusicXMLReader
 from fingering.phrasing.pipeline import PhraseAwareFingering
 
 # Grand staff (2 staves)
-rh, lh = MusicXMLReader().parse_grand_staff("piece.musicxml")
+rh, lh, tonic_pc, mode = MusicXMLReader().parse_grand_staff_with_key("piece.musicxml")
 
-paf = PhraseAwareFingering()
-rh_fingering = paf.run(rh)   # [1, 2, 3, 1, 2, ...]
-lh_fingering = paf.run(lh)   # [5, 3, 1, 5, 3, ...]
+paf = PhraseAwareFingering(tonic_pc=tonic_pc)
+rh_fingering = paf.run(rh, companion_notes=lh)  # [1, 2, 3, 1, 2, ...]
+lh_fingering = paf.run(lh, companion_notes=rh)  # [5, 3, 1, 5, 3, ...]
 
 # Or annotate in-place
-paf.run_and_annotate(rh)  # sets note.finger on each NoteEvent
+paf.run_and_annotate(rh, companion_notes=lh)  # sets note.finger on each NoteEvent
 ```
 
-### Demo scripts
+### Demo & Diagnostic scripts
 
 ```bash
-# Single-staff demo
-python scripts/demo_musicxml.py test_file/cW8VLC9nnTo.musicxml
-
-# Grand staff demo (RH + LH breakdown)
+# Grand staff demo (RH + LH breakdown, phrase analysis)
 python scripts/demo_grand_staff.py test_file/FN7ALfpGxiI.musicxml
+
+# PIG dataset benchmark
+python scripts/pig_eval.py 20
+
+# Fingering violation audit
+python scripts/audit_fingering.py test_file/FN7ALfpGxiI.musicxml
+
+# Error category analysis on PIG
+python scripts/error_analysis.py 20
 ```
 
 ---
 
 ## 📊 Hiện trạng & Roadmap
 
-### ✅ Đã hoàn thành
+### ✅ Phase 2.5 — Hoàn thành
 
 | Module | Mô tả |
 |--------|-------|
-| `NoteEvent` | Data model với keyboard geometry (white-key index, black key) |
-| `keyboard.py` | Span limits, LH/RH natural finger order, thumb crossing |
-| `MusicXMLReader` | Parser grand staff (RH/LH auto-detect), onset tracking đúng |
-| `PhraseBoundaryDetector` | Signal fusion + 3 improvements + forced segmentation |
-| `PhraseIntentAnalyzer` | 5 intent types, tension curve, climax detection |
-| `PhraseScopedDP` | Viterbi DP với LH-aware ergonomics |
-| `PatternLibrary` | Scale/arpeggio detect → inject 1-2-3-1 fingering |
-| `ChordHeuristic` | Simultaneous notes → 1-3-5 (RH) / 5-3-1 (LH) |
-| `CrossPhraseStitch` | Junction constraint, smooth cross-phrase transition |
-| `PhraseAwareFingering` | Pipeline orchestrator |
-| Tests | 34 unit tests, 7 test classes |
+| `voice_separation.py` | Melody stream extraction từ polyphonic RH |
+| `boundary_detector.py` | Logit/Sigmoid probability + Viterbi global DP |
+| `scale_fingering.py` | 12-tone scale fingering database (all major + minor) |
+| `pattern_library.py` | Tone-specific scale, Hanon 5-finger patterns |
+| `phrase_dp.py` | Thumb-Under/Finger-Over rewards, biomechanics |
+| `keyboard.py` | Tendon coupling, black key depth, tempo-aware span |
+| `fingering_auditor.py` | 9-rule post-DP auditor + auto-repair |
+| `error_analysis.py` | Error categorizer (9 types + confusion matrix) |
+| Tests | 35 unit tests pass |
 
-### 🚧 Tiếp theo
+### 🚧 Phase 3 — Tiếp theo (Neural)
 
 | Priority | Việc cần làm |
 |----------|-------------|
-| HIGH | **Pattern Library mở rộng** — inject specific broken-chord patterns (GT đang khác vì player dùng 4-5-1-2 thay 1-2-3-4) |
-| HIGH | **MusicXML parser: nốt nối (tie)** — hiện chưa skip tied notes đúng cách |
-| MED  | **Data Layer** — PIG dataset loader (150 pieces, multi-annotator) |
-| MED  | **Neural baseline** — BI-LSTM/CRF trained on PIG dataset |
-| LOW  | **Score export** — ghi fingering annotation trở lại file MusicXML |
+| HIGH | **THUMB_MISS fix** — giảm thiên vị ngón cái trong DP cost model |
+| HIGH | **MusicXML parser: tied notes** — skip tied notes đúng cách |
+| HIGH | **Neural baseline** — BI-LSTM/CRF trained on full PIG dataset (309 files) |
+| MED  | **Octave/interval fingering** — 1-5 octaves, 1-3/1-4 thirds |
+| MED  | **Score export** — ghi fingering annotation ngược lại vào MusicXML |
+| LOW  | **Trill/tremolo detection** — alternating finger patterns |
 
 ---
 
 ## 🔬 So sánh với pianist thật sự
 
 | Cognitive step | Pianist | Hệ thống này |
-|---------------|---------|--------------|
-| Nhìn tổng quát | Scan toàn bản, nhận ra key/meter | ✅ MusicXML parse: key, time sig |
-| Đọc theo phrase | Nhóm note theo arc nhạc | ✅ PhraseBoundaryDetector (Layer A) |
-| Nhận ý nhạc | Legato? Brilliant? | ✅ PhraseIntentAnalyzer (Layer B) |
-| Pattern recognition | "Đây là scale C major" → 1-2-3-1 | ✅ PatternLibrary (Fix 2) |
-| Chord fingering | C-E-G LH → 5-3-1 reflexively | ✅ ChordHeuristic (Fix 3) |
-| Cross-phrase | Ngón cuối phrase A → ngón đầu phrase B | ✅ CrossPhraseStitch (Layer D) |
-| Climax shaping | Ngón mạnh tại đỉnh arc | ✅ PhraseScopedDP climax reward |
-| LH vs RH | Ngón thuận ngược chiều | ✅ LH-aware ergonomics |
-| Học từ data | Điều chỉnh theo phong cách | 🚧 Neural model (chưa) |
-| High-level structure | Nhận ra sonata form | ❌ Ngoài scope hiện tại |
+|---------------|---------|--------------:|
+| Nhìn tổng quát | Scan toàn bản, key/meter | ✅ MusicXML parse |
+| Đọc theo phrase (global) | Tối ưu toàn bản | ✅ Viterbi DP segmentation |
+| Voice separation | Phân biệt giai điệu / đệm | ✅ Melody stream extraction |
+| Nhận ý nhạc | Legato? Brilliant? | ✅ PhraseIntentAnalyzer |
+| Pattern recognition | "C major scale" → 1-2-3-1 | ✅ 12-tone PatternLibrary |
+| Luồn ngón (thumb-under) | Ngón cái chui qua | ✅ Reward model |
+| Vắt ngón (finger-over) | Ngón 3 vắt qua ngón cái | ✅ Reward model |
+| Sinh học ngón tay | Gân 3-4 liên kết, tempo | ✅ Biomechanical costs |
+| Chord fingering | C-E-G LH → 5-3-1 | ✅ ChordHeuristic |
+| Cross-phrase planning | Ngón cuối A → đầu B | ✅ CrossPhraseStitch |
+| Kiểm tra lỗi | "Ngón này không thể" | ✅ FingeredAuditor |
+| Học từ data | Điều chỉnh phong cách | 🚧 Phase 3 — Neural Model |
 
 ---
 
@@ -240,10 +274,12 @@ python scripts/demo_grand_staff.py test_file/FN7ALfpGxiI.musicxml
 ```toml
 # Core
 numpy
-# Optional: neural model
+
+# Optional: neural model (Phase 3)
 torch
 torchcrf
-# Optional: music21 for advanced parsing
+
+# Optional: advanced parsing
 music21
 ```
 
