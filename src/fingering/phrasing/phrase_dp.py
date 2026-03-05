@@ -21,7 +21,7 @@ from fingering.core.keyboard import (
     white_key_span, finger_span_limits, is_ascending,
     natural_finger_order, thumb_crossing_natural,
     black_key_span_correction, tendon_coupling_penalty, tempo_adjusted_max_span,
-    physical_span_mm, finger_max_span_mm, is_in_hand_position,
+    physical_span_mm, finger_max_span_mm, is_in_hand_position, span_cost,
 )
 from fingering.phrasing.phrase import Phrase, PhraseIntent
 from fingering.phrasing.pattern_library import apply_pattern_constraints
@@ -283,46 +283,37 @@ class PhraseScopedDP:
                 cost += REPEATED_THUMB_PENALTY
 
         # ── Ergonomic: physical span (mm) stretch cost ───────────────────
-        # Use physical key positions in mm (keyboard.py physical model).
+        # 3-zone model (keyboard.py span_cost):
+        #   Zone 1 (comfortable)  → free
+        #   Zone 2 (stretch zone) → quadratic light
+        #   Zone 3 (over-stretch) → hard barrier
         span_mm = physical_span_mm(note_prev, note_curr)
-        max_mm  = finger_max_span_mm(f_prev, f_curr)
 
-        # Tempo scaling: fast playing = compact hand needed
+        # Tempo scaling: fast → tighter comfortable zone
         bpm = getattr(note_curr, 'tempo', 120.0) or 120.0
         if bpm >= 180:
-            max_mm *= 0.85
+            span_mm *= 1.15
         elif bpm >= 120:
-            max_mm *= 0.92
+            span_mm *= 1.07
 
-        over_mm = max(0.0, span_mm - max_mm)
-
-        # ── HandState: infer full hand position from (note, finger) ──────
-        # v2: uses thumb_mm (physical anchor) — correctly handles in-position
-        # jumps like E5(f1)→A5(f4) where thumb never moves.
+        # ── HandState: infer full hand position ──────────────────────────
         pos_prev = _hand_tracker.infer(note_prev, f_prev)
         pos_curr = _hand_tracker.infer(note_curr, f_curr)
-
-        # ── Lazy First Principle ──────────────────────────────────────────
-        # Check via HandState.is_in_position(): does the curr note fall
-        # under finger f_curr given the prev hand position?  If yes → free.
         in_position = pos_prev.is_in_position(note_curr, f_curr)
 
+        # ── Lazy First Principle ──────────────────────────────────────────
         if in_position:
-            # Hand doesn't move — strong reward for staying put.
             cost += IN_POSITION_REWARD
         else:
-            # Hand must reposition.  Two sub-cases:
             if span > LARGE_LEAP_THRESHOLD:
-                # Large leap: pianist repositions hand. Fixed cost + anchor guidance.
                 cost += LARGE_LEAP_REPOSITION_COST
                 if ascending and f_curr in (3, 4, 5):
                     cost += LARGE_LEAP_ANCHOR_REWARD
                 elif not ascending and f_curr in (1, 2):
                     cost += LARGE_LEAP_ANCHOR_REWARD
             else:
-                # Small reposition: quadratic stretch penalty in mm domain.
-                # 20mm over → 20² × 0.003 = 1.2 cost  (1 octave = 164.5mm)
-                cost += over_mm ** 2 * 0.003
+                # 3-zone span cost — only when hand is repositioning
+                cost += span_cost(span_mm, f_prev, f_curr)
 
         # ── Phase 3B: Hand position shift cost ───────────────────────────
         # Additional cost for the physical distance the thumb must travel.

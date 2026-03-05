@@ -53,19 +53,34 @@ _PC_TO_MM_OFFSET: dict[int, float] = {
 }
 
 # Maximum comfortable inter-finger span in mm (adult average, M+F blended).
-# Based on Li et al. (2016) hand anthropometry + piano biomechanics.
-# Values are LARGER than the WK-unit table because mm is more precise.
+# ── Comfortable span (mm): feels natural, no strain  ──────────────────────
+# User biomechanical data (cm → mm).  This is ZONE 1 (free zone).
+COMFORTABLE_SPAN_MM: dict[Tuple[int, int], float] = {
+    (1, 2):  40.0,   # Thumb – Index      comfortable
+    (1, 3):  70.0,   # Thumb – Middle     very natural
+    (1, 4):  90.0,   # Thumb – Ring       used a lot
+    (1, 5): 160.0,   # Thumb – Pinky      octave
+    (2, 3):  30.0,   # Index – Middle     flexible
+    (2, 4):  70.0,   # Index – Ring       common
+    (2, 5): 110.0,   # Index – Pinky      slightly tense
+    (3, 4):  25.0,   # Middle – Ring      weak (tendon coupling)
+    (3, 5):  90.0,   # Middle – Pinky     ok
+    (4, 5):  25.0,   # Ring – Pinky       weak
+}
+
+# ── Max stretch (mm): possible but tense — ZONE 2 boundary ─────────────────
+# Beyond this = very hard / risky.  Replaces old MAX_SPAN_MM.
 MAX_SPAN_MM: dict[Tuple[int, int], float] = {
-    (1, 2): 118.0,   # Thumb – Index
-    (1, 3): 163.5,   # Thumb – Middle
-    (1, 4): 191.0,   # Thumb – Ring
-    (1, 5): 215.0,   # Thumb – Pinky  (full hand stretch)
-    (2, 3):  66.0,   # Index – Middle
-    (2, 4): 114.0,   # Index – Ring
-    (2, 5): 158.0,   # Index – Pinky
-    (3, 4):  66.0,   # Middle – Ring
-    (3, 5): 114.0,   # Middle – Pinky
-    (4, 5):  66.0,   # Ring – Pinky
+    (1, 2):  60.0,   # was 118  — corrected to realistic
+    (1, 3):  90.0,   # was 163.5
+    (1, 4): 110.0,   # was 191
+    (1, 5): 200.0,   # was 215  — octave full stretch
+    (2, 3):  50.0,   # was 66
+    (2, 4):  90.0,   # was 114
+    (2, 5): 140.0,   # was 158
+    (3, 4):  40.0,   # was 66   — tendon coupled, very limited
+    (3, 5): 120.0,   # was 114
+    (4, 5):  40.0,   # was 66   — tendon coupled
 }
 
 # Minimum comfortable span (some fingers can't be too close)
@@ -125,9 +140,43 @@ def physical_span_mm(note_a: NoteEvent, note_b: NoteEvent) -> float:
 
 
 def finger_max_span_mm(f1: int, f2: int) -> float:
-    """Max comfortable span (mm) for a finger pair, from MAX_SPAN_MM table."""
+    """Max stretch span (mm) — zone 2 boundary."""
     key = (min(f1, f2), max(f1, f2))
-    return MAX_SPAN_MM.get(key, 215.0)
+    return MAX_SPAN_MM.get(key, 200.0)
+
+
+def finger_comfortable_span_mm(f1: int, f2: int) -> float:
+    """Comfortable span (mm) — zone 1 boundary (free zone)."""
+    key = (min(f1, f2), max(f1, f2))
+    return COMFORTABLE_SPAN_MM.get(key, 160.0)
+
+
+def span_cost(span_mm: float, f1: int, f2: int) -> float:
+    """
+    3-zone span cost model for finger pairs.
+
+    Note: span_mm here is the physical distance between two SEQUENTIAL notes,
+    not the simultaneous chord stretch.  COMFORTABLE_SPAN_MM is therefore
+    used as a soft guide rather than a hard threshold.
+
+      Zone 1  span ≤ comfortable   → cost = 0.0   (natural)
+      Zone 2  comfortable < span ≤ max   → quadratic (soft)
+      Zone 3  span > max              → quadratic (heavier, no hard wall)
+
+    Keeping the cost smooth avoids cliff-effects in Viterbi DP.
+    """
+    comfortable = finger_comfortable_span_mm(f1, f2)
+    max_stretch = finger_max_span_mm(f1, f2)
+
+    if span_mm <= comfortable:
+        return 0.0
+    elif span_mm <= max_stretch:
+        excess = span_mm - comfortable
+        return excess ** 2 * 0.0005       # very soft zone 2
+    else:
+        zone2 = (max_stretch - comfortable) ** 2 * 0.0005
+        over  = span_mm - max_stretch
+        return zone2 + over ** 2 * 0.003  # heavier but still smooth
 
 
 def is_in_hand_position(note_a: NoteEvent, f_a: int,
