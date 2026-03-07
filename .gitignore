@@ -206,5 +206,6 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-.musicxml
+*.musicxml
+*.txt
 PianoFingeringDataset_v1.2/
