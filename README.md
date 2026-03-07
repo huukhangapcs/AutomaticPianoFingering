@@ -17,6 +17,8 @@ Thay vì sử dụng thuật toán "Snapping" cứng nhắc (tái căn chỉnh f
 * **Cơ chế Kéo/Đẩy (Drag/Push):** Các ngón tay tự do di chuyển trong phạm vi thoải mái (`COMF_SPAN`). Bàn tay chỉ bị kéo lùi hoặc đẩy tới khi quãng với ngón lân cận vượt quá giới hạn cấu phẫu tự nhiên của tay người hoặc bị quá chật (`MIN_SPAN`).
 * **Inertia Glide:** Giảm điểm phạt ma sát (`INERTIA_WEIGHT` xuống 0.3) giúp thuật toán nhìn xa tốt hơn, lướt tay tịnh tiến mượt mà từ âm khu thấp lên âm khu cao để đón đầu các phrase giai điệu đỉnh.
 * **Quy hoạch động Viterbi nâng cấp:** State DP lưu trữ lại toàn bộ trạng thái `HandState` băng qua từng cụm nốt, bảo toàn được quán tính vật lý thực sự của chuỗi vận động thay vì chỉ lưu điểm số Cost.
+* **Tự động hóa Tay Trái (Left Hand Automation):** Xử lý đồng thời cả `staff=1` và `staff=2`. Trục X của tay trái được cấu hình đối xứng (đảo dấu `-X`) ngay từ bước đọc XML, giúp tái sử dụng 100% logic Viterbi của tay phải chuẩn xác tuyệt đối mà không cần thiết kế lại hand form bổ sung.
+* **Bộ lọc số ngón (Sparse Fingering / Decluttering):** Tích hợp bộ heuristic làm sạch kết quả xuất XML. Tự động ẩn các ngón chạy scale liền bậc hiển nhiên (IN_FORM) đối với RH và các mẫu đệm tự nhiên đối với LH. Chỉ xuất ép buộc các số ngón tại điểm ngắt nhạc, qua ngón cái (Thumb-under), vắt ngón (Cross-over) hoặc dãn tay xa/nhảy quãng.
 
 ---
 
