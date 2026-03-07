@@ -332,14 +332,45 @@ def transition_cost(
 # Reset Point Detection
 # ---------------------------------------------------------------------------
 
-def is_reset_point(note_duration: int, divisions: int, rest_before: bool) -> bool:
+def is_reset_point(
+    note_duration: int, 
+    divisions: int, 
+    rest_before: bool,
+    tempo: float = 120.0,
+    note_prev_x: float = 0.0,
+    note_curr_x: float = 0.0
+) -> bool:
     """True nếu nốt hiện tại là điểm có thể reset bàn tay.
+    Cho phép reset nếu:
+    1. Nghỉ > 1 beat hoặc nốt giữ dài > 2 beats dài.
+    2. Vận tốc tịnh tiến (Velocity) tay trên phím không văng quá giới hạn vật lý.
 
     Args:
-        note_duration: Duration của nốt (hoặc rest) trước đó, in divisions
-        divisions:     Số divisions per quarter note
-        rest_before:   True nếu có rest trước note đó
+        note_duration: Duration của nốt (hoặc rest) trước đó, in divisions.
+        divisions:     Số divisions per quarter note.
+        rest_before:   True nếu có rest trước note đó.
+        tempo:         BPM (Beats per minute).
+        note_prev_x:   Tọa độ nốt trước đó (mm).
+        note_curr_x:   Tọa độ nốt hiện tại (mm).
     """
     beats = note_duration / divisions
-    # Reset point: rest > 1 beat hoặc note dài > 2 beats
-    return rest_before and beats > 1.0 or beats > 2.0
+    
+    # Check basic musical boundary
+    is_musical_boundary = rest_before and beats > 1.0 or beats > 2.0
+    if not is_musical_boundary:
+        return False
+        
+    # Check physical velocity constraint
+    # 1 Beat (Quarter note) = 60000 / tempo (ms)
+    time_ms = beats * (60000.0 / tempo)
+    distance_mm = abs(note_curr_x - note_prev_x)
+    
+    # Tốc độ di chuyển tay (mm/s)
+    # Giới hạn vật lý con người ~ 2000 mm/s cho những cú nhảy cục bộ
+    velocity_mm_s = (distance_mm / time_ms) * 1000.0 if time_ms > 0 else 0
+    MAX_VELOCITY = 2000.0
+    
+    if velocity_mm_s > MAX_VELOCITY:
+        return False
+        
+    return True

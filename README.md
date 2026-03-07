@@ -55,11 +55,11 @@ Hệ thống tính toán mô hình vật lý V2 đã được chạy đánh giá
 
 | Metric | Version 2 (Dynamic Physics) |
 |---|:---:|
-| **Exact Match** (Đoán chính xác 100% ngón chuẩn) | **45.40%** |
-| **Off-by-one** (Sai số 1 ngón liền kề hợp lý) | **38.75%** |
-| **Combined (Tỉ lệ chuẩn form tay ≤1 error)** | **84.15%** |
+| **Exact Match** (Đoán chính xác 100% ngón chuẩn) | **45.86%** |
+| **Off-by-one** (Sai số 1 ngón liền kề hợp lý) | **39.52%** |
+| **Combined (Tỉ lệ chuẩn form tay ≤1 error)** | **85.38%** |
 
-> **Key insight:** Với việc chỉ sai lệch form tay 1 ngón đạt **hơn 84%**, thuật toán Viterbi đã chạm đến trần (Ceiling) của mô hình chạy bằng luật (Rule-based). Các trường hợp Off-by-one đa phần là các lựa chọn thay thế hoàn toàn hợp lệ (ví dụ: nghệ sĩ dùng ngón 4 thay vì ngón 3, dùng ngón 1 thay vì ngón 2) không gây ra xoắn chéo tay vật lý (Cross-over lỗi).
+> **Key insight:** Với việc áp dụng Giới hạn Vận Tốc Vật Lý (Tempo-aware ms velocity) và Ngăn chặn dị dạng sải tay Hợp âm (Chord span limitation), thuật toán Viterbi đã phá vỡ trần 84% trước đó và thiết lập đỉnh mới **hơn 85.38%**. Các trường hợp Off-by-one đa phần là các lựa chọn thay thế hoàn toàn hợp lệ (ví dụ: nghệ sĩ dùng ngón 4 thay vì ngón 3, dùng ngón 1 thay vì ngón 2) không gây ra xoắn chéo tay vật lý (Cross-over lỗi).
 > 
 > Khoảng hụt lại (dưới 16%) đa số rơi vào các biến tấu Phân tích ý đồ Câu nhạc (Nhấn mạnh, Phân giọng, Trượt phím đệm).
 

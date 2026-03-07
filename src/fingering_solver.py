@@ -53,12 +53,14 @@ def _initial_costs(note: NoteEvent) -> dict[int, Tuple[float, HandState]]:
 def solve(
     all_notes: List[NoteEvent],
     divisions: int,
+    tempo: float = 120.0
 ) -> List[Tuple[NoteEvent, int]]:
     """Gán ngón tay tối ưu cho toàn bộ notes tay phải.
 
     Args:
         all_notes:  Tất cả NoteEvent (kể cả chord members)
-        divisions:  Số divisions per quarter note
+        divisions:  Số division per quarter note
+        tempo:      BPM (Beats per minute)
 
     Returns:
         List[(NoteEvent, finger)] cho TẤT CẢ notes
@@ -95,16 +97,50 @@ def solve(
     prev_dur = primaries[0].duration
     prev_is_rest = False
 
-    # --- Viterbi forward pass ---
+    # Precompute chord dict for fast lookup: onset_division -> list of note.x
+    chord_xs_by_onset: dict[int, List[float]] = {}
+    for n in all_notes:
+        if n.onset_division not in chord_xs_by_onset:
+            chord_xs_by_onset[n.onset_division] = []
+        chord_xs_by_onset[n.onset_division].append(n.x)
+        
     for i in range(1, N):
         note = primaries[i]
         dp_next: dict[int, Tuple[float, HandState]] = {f: (INF, HandState.snap(note.x, f)) for f in range(1, 6)}
         bt_next: dict[int, Optional[int]] = {f: None for f in range(1, 6)}
 
         # Detect reset point: rest trước note này, hoặc note trước rất dài
-        at_reset = is_reset_point(prev_dur, divisions, prev_is_rest)
+        # Mới: Check thêm vận tốc tịnh tiến (Velocity) không vượt ngưỡng
+        at_reset = is_reset_point(
+            note_duration=prev_dur, 
+            divisions=divisions, 
+            rest_before=prev_is_rest,
+            tempo=tempo,
+            note_prev_x=prev_note.x,
+            note_curr_x=note.x
+        )
+        
+        # Mới: True Polyphony Span Penalties
+        # Tìm nốt dãn xa nhất (thường là nốt thấp nhất ở rank cuối)
+        current_chord_xs = chord_xs_by_onset.get(note.onset_division, [])
+        max_chord_span = 0.0
+        if current_chord_xs:
+            max_chord_span = max(current_chord_xs) - min(current_chord_xs)
 
         for f_curr in range(1, 6):
+        
+            # Kiểm tra nếu f_curr cho nốt đỉnh kết hợp với bề rộng hợp âm vượt quá sải tay con người.
+            # Giả định nốt dưới cùng do ngón 5 (hoặc ngón 1 cho tay trái) phụ trách. COMF_SPAN * 2.5 ~ MAX SPAN thực tế.
+            # Rất thô sơ nhưng hiệu quả chặn gãy tay.
+            if f_curr == 5 and max_chord_span > 0:
+                # Nếu đỉnh dùng ngón 5, đáy dùng ngón 1 -> Span tối đa 1-5
+                if max_chord_span > 15.0: # Khoảng 1 quãng 9-10
+                    continue
+            elif f_curr < 5 and max_chord_span > 0:
+                # Nếu đỉnh dùng ngón 3, 4 -> Đáy dùng ngón phụ hoặc 1. Span thu hẹp lại.
+                if max_chord_span > (15.0 - (5-f_curr)*3.0): 
+                    continue
+
             for f_prev in range(1, 6):
                 cost_prev, s_prev = dp_curr[f_prev]
                 if cost_prev >= INF:
@@ -242,4 +278,4 @@ def solve_file(musicxml_path: str) -> List[Tuple[NoteEvent, int]]:
     """Parse + solve trong 1 lần gọi."""
     from src.musicxml_parser import parse_hand_notes
     notes, divisions, tempo = parse_hand_notes(musicxml_path)
-    return solve(notes, divisions)
+    return solve(notes, divisions, tempo)
