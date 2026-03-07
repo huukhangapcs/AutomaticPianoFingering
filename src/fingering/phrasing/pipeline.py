@@ -212,8 +212,17 @@ class PhraseAwareFingering:
         for phrase in analyzed:
             stitch = None
             if prev_phrase is not None and prev_fingering is not None:
+                # Calculate actual rest gap between phrases (in seconds)
+                # beats_per_sec = bpm / 60; default 120 BPM if not available
+                bpm = getattr(self, 'bpm', 120.0)
+                beats_per_sec = bpm / 60.0
+                if prev_phrase.notes and phrase.notes:
+                    gap_beats = phrase.notes[0].onset - prev_phrase.notes[-1].offset
+                    rest_sec = max(0.0, gap_beats / beats_per_sec)
+                else:
+                    rest_sec = 0.0
                 stitch = self.stitcher.compute_constraint(
-                    prev_phrase, phrase, prev_fingering
+                    prev_phrase, phrase, prev_fingering, rest_sec=rest_sec
                 )
             fingering = self.dp_solver.solve(phrase, stitch_constraint=stitch)
 

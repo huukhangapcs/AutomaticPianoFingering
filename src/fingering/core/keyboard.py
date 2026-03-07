@@ -182,11 +182,26 @@ def span_cost(span_mm: float, f1: int, f2: int) -> float:
 def is_in_hand_position(note_a: NoteEvent, f_a: int,
                         note_b: NoteEvent, f_b: int) -> bool:
     """
-    Returns True if note_b with finger f_b is reachable from the hand
-    position established by note_a with finger f_a WITHOUT repositioning.
+    [DEPRECATED] Use HandPositionTracker + HandState.is_in_position() instead.
 
-    Core of Lazy First Principle: if True, hand stays put.
+    This function compares the physical distance between two NOTES against
+    the max span of two FINGERS — a semantically incorrect comparison that
+    ignores actual hand position. It assumes the hand is anchored on note_a
+    with finger f_a, which is not a valid assumption in all contexts.
+
+    Replacement:
+        tracker = HandPositionTracker()
+        state = tracker.infer(note_a, f_a)
+        result = state.is_in_position(note_b, f_b)
+
+    Kept for backward compatibility only.
     """
+    import warnings
+    warnings.warn(
+        "is_in_hand_position() is deprecated. Use HandPositionTracker.infer() "
+        "+ HandState.is_in_position() from fingering.phrasing.hand_position.",
+        DeprecationWarning, stacklevel=2,
+    )
     span = physical_span_mm(note_a, note_b)
     max_s = finger_max_span_mm(f_a, f_b)
     return span <= max_s

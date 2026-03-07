@@ -34,9 +34,36 @@ from fingering.core.keyboard import physical_key_position_mm, _WHITE_KEY_WIDTH_M
 
 _WK = _WHITE_KEY_WIDTH_MM   # 23.5 mm per white-key step
 
-# Tolerance: ±15mm (~0.6 WK) — notes this close to the expected finger
-# position are considered "in-position" (micro-adjustments are free).
-_IN_POSITION_TOLERANCE_MM = 15.0
+# ── Anatomical Finger Offset Table ───────────────────────────────────
+# Physical offset (mm) from thumb (f1) to each finger in a natural,
+# relaxed hand position (right hand). Based on adult hand anthropometry:
+#   Thumb (f1)   : anchor = 0 mm
+#   Index (f2)   : ~42 mm  (≈1.8 WK — wider gap due to thumb abduction)
+#   Middle (f3)  : ~72 mm  (≈3.1 WK — longest finger, natural arch)
+#   Ring (f4)    : ~97 mm  (≈4.1 WK — tendon-coupled to middle)
+#   Pinky (f5)   : ~118 mm (≈5.0 WK — smallest, shortest reach)
+# Left hand mirrors (negative offsets).
+# NOTE: Previous model used linear (f-1)*WK = 0, 23.5, 47, 70.5, 94 mm —
+#       significantly underestimating index reach and overestimating ring/pinky.
+_FINGER_OFFSET_MM: dict[int, float] = {
+    1:   0.0,   # Thumb   (anchor)
+    2:  42.0,   # Index   (~1.8 WK)
+    3:  72.0,   # Middle  (~3.1 WK)
+    4:  97.0,   # Ring    (~4.1 WK)
+    5: 118.0,   # Pinky   (~5.0 WK)
+}
+
+# ── Per-finger position tolerance (mm) ───────────────────────────────
+# How far a note can be from the expected finger position and still be
+# considered "in position" (no hand repositioning needed).
+# Thumb is most flexible (abducts widely); pinky is least flexible.
+_FINGER_TOLERANCE_MM: dict[int, float] = {
+    1: 25.0,   # Thumb:  very flexible, wide abduction range
+    2: 18.0,   # Index:  good independence
+    3: 15.0,   # Middle: moderate
+    4: 12.0,   # Ring:   limited by tendon coupling
+    5: 10.0,   # Pinky:  least flexible
+}
 
 # Shift below this threshold is free (hand micro-adjusts without repositioning).
 # ~1 white key = 23.5mm.  We allow half a white key of free drift.
@@ -56,28 +83,27 @@ class HandState:
     Full physical state of the hand at one moment in time.
 
     `thumb_mm` = physical center position (mm) of the thumb (finger 1).
-    All other fingers follow from this anchor via white-key offsets:
+    Other fingers follow anatomical offsets (_FINGER_OFFSET_MM), NOT uniform
+    white-key spacing. The offsets reflect real hand geometry:
 
-        Right Hand (ascending keyboard direction = right):
-            f1 = thumb_mm + 0*WK
-            f2 = thumb_mm + 1*WK
-            f3 = thumb_mm + 2*WK
-            f4 = thumb_mm + 3*WK
-            f5 = thumb_mm + 4*WK
+        Right Hand:
+            f1 = thumb_mm + 0 mm   (thumb)
+            f2 = thumb_mm + 42 mm  (index — wider gap due to thumb abduction)
+            f3 = thumb_mm + 72 mm  (middle)
+            f4 = thumb_mm + 97 mm  (ring)
+            f5 = thumb_mm + 118 mm (pinky)
 
-        Left Hand (mirror — pinky is to the left of thumb):
-            f1 = thumb_mm + 0*WK
-            f2 = thumb_mm - 1*WK
-            f3 = thumb_mm - 2*WK
-            f4 = thumb_mm - 3*WK
-            f5 = thumb_mm - 4*WK
+        Left Hand (mirror — offsets are negated):
+            f1 = thumb_mm - 0 mm
+            f2 = thumb_mm - 42 mm
+            ... etc.
     """
     thumb_mm: float   # mm position of thumb (f1)
     hand: str         # 'right' | 'left'
 
     def finger_mm(self, f: int) -> float:
-        """Physical position (mm) of finger f in this hand state."""
-        offset = (f - 1) * _WK
+        """Physical position (mm) of finger f using anatomical offsets."""
+        offset = _FINGER_OFFSET_MM[f]
         if self.hand == 'left':
             offset = -offset
         return self.thumb_mm + offset
@@ -90,13 +116,13 @@ class HandState:
         """
         True if `note` can be played with `finger` without moving the hand.
 
-        We compare the note's physical key position to where finger `f` is
-        expected to be in this hand state.  If the difference is within
-        _IN_POSITION_TOLERANCE_MM, the hand stays put.
+        Uses per-finger tolerance: thumb is most flexible (±25mm),
+        pinky is least flexible (±10mm).
         """
         expected_mm = self.finger_mm(finger)
         actual_mm   = physical_key_position_mm(note.pitch)
-        return abs(actual_mm - expected_mm) <= _IN_POSITION_TOLERANCE_MM
+        tolerance   = _FINGER_TOLERANCE_MM[finger]
+        return abs(actual_mm - expected_mm) <= tolerance
 
     def all_finger_positions(self) -> dict[int, float]:
         """Return {finger: mm} for all 5 fingers."""
@@ -118,22 +144,31 @@ class HandPositionTracker:
         """
         Reconstruct the hand state given that `note` is played with `finger`.
 
-        For RH: thumb (f1) is to the LEFT of finger f.
-            thumb_mm = note_mm - (f-1) * WK
+        Uses anatomical offsets (not uniform WK spacing) to back-calculate
+        where the thumb must be when finger `f` is on `note`.
 
-        For LH: thumb (f1) is to the RIGHT of finger f (keyboard mirror).
-            thumb_mm = note_mm + (f-1) * WK
+        For RH: thumb is to the LEFT of finger f by _FINGER_OFFSET_MM[f].
+            thumb_mm = note_mm - _FINGER_OFFSET_MM[finger]
+
+        For LH: thumb is to the RIGHT of finger f (keyboard mirror).
+            thumb_mm = note_mm + _FINGER_OFFSET_MM[finger]
         """
-        hand     = getattr(note, 'hand', 'right')
-        note_mm  = physical_key_position_mm(note.pitch)
-        offset   = (finger - 1) * _WK
+        hand    = getattr(note, 'hand', 'right')
+        note_mm = physical_key_position_mm(note.pitch)
+        offset  = _FINGER_OFFSET_MM[finger]
         if hand == 'right':
             thumb_mm = note_mm - offset
         else:
             thumb_mm = note_mm + offset
         return HandState(thumb_mm=thumb_mm, hand=hand)
 
-    def shift_cost(self, prev: HandState, curr: HandState) -> float:
+    def shift_cost(
+        self,
+        prev: HandState,
+        curr: HandState,
+        f_prev: int | None = None,
+        f_curr: int | None = None,
+    ) -> float:
         """
         Cost of moving the hand from `prev` to `curr` position.
 
@@ -141,6 +176,10 @@ class HandPositionTracker:
 
         Free zone  : ≤ _FREE_SHIFT_MM (~½ white key) — micro-adjustments.
         Quadratic  : excess² × 0.5 / WK²  — large shifts are very expensive.
+        Twist bonus: when hand barely moves but finger index jumps ≥3 positions,
+                     add a small penalty for the awkward wrist/hand rotation
+                     required. E.g., 1→5 at the same keyboard position is
+                     technically in-range but biomechanically awkward.
 
         Examples (WK = 23.5 mm):
             shift =  0 mm → cost 0.0   (perfectly in position)
@@ -149,12 +188,142 @@ class HandPositionTracker:
             shift = 94 mm → cost 0.5×(82/23.5)² ≈ 6.1  (4 WK excess = octave shift)
         """
         shift_mm = prev.distance_to(curr)
+
+        # ── Physical displacement cost (quadratic beyond free zone) ──
         if shift_mm <= _FREE_SHIFT_MM:
-            return 0.0
-        excess_mm = shift_mm - _FREE_SHIFT_MM
-        # Normalise to white-key units so the scale is comparable to other costs
-        excess_wk = excess_mm / _WK
-        return excess_wk ** 2 * 0.5
+            base = 0.0
+        else:
+            excess_mm = shift_mm - _FREE_SHIFT_MM
+            excess_wk = excess_mm / _WK
+            base = excess_wk ** 2 * 0.5
+
+        # ── Finger-twist penalty ──────────────────────────────────────
+        # When thumb barely moves but finger index jumps ≥3 (e.g. 1→5 in same
+        # position), the hand must supinate/pronate. Add a soft penalty.
+        twist = 0.0
+        if f_prev is not None and f_curr is not None:
+            f_delta = abs(f_curr - f_prev)
+            if shift_mm <= _FREE_SHIFT_MM and f_delta >= 3:
+                # Scale: Δf=3 → 0.3, Δf=4 → 0.6  (kept light, just a tiebreaker)
+                twist = (f_delta - 2) * 0.3
+
+        return base + twist
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Hand Movement Taxonomy
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+from enum import Enum, auto
+
+
+class HandMovementType(Enum):
+    """
+    The 5 fundamental types of hand movement in piano playing.
+
+    Each transition between two consecutive (note, finger) pairs falls into
+    exactly one of these categories. The DP uses this classification to apply
+    the appropriate biomechanical cost instead of scattered ad-hoc rules.
+
+                         Ascending RH  |  Descending RH
+    ───────────────────────────────────────────────────────
+    Hand stays in place  IN_FORM       |  IN_FORM
+    Fingers reach out    STRETCHING    |  STRETCHING
+    Thumb crosses under  THUMB_UNDER   |  (not applicable)
+    Finger crosses over  (applies LH)  |  CROSS_OVER
+    Full reposition      RESET         |  RESET
+    """
+
+    IN_FORM     = auto()   # Hand stays in position; finger within _FINGER_TOLERANCE_MM
+    STRETCHING  = auto()   # Finger reaches beyond normal position; no crossing
+    THUMB_UNDER = auto()   # Ascending: current f∈{2,3} → next f=1 (thumb crosses under)
+    CROSS_OVER  = auto()   # Descending: current f=1 → next f∈{2,3} (finger crosses over)
+    RESET       = auto()   # Hand lifts and repositions; thumb_mm shift > threshold
+
+
+def classify_movement(
+    note_prev: NoteEvent,
+    f_prev: int,
+    note_curr: NoteEvent,
+    f_curr: int,
+    tracker: Optional['HandPositionTracker'] = None,
+) -> HandMovementType:
+    """
+    Classify the transition from (note_prev, f_prev) → (note_curr, f_curr).
+
+    Classification rules (in priority order):
+
+    1. THUMB_UNDER — ascending passage, current finger is 2 or 3, next is 1.
+       The thumb physically crosses underneath the active finger.
+       Right hand: note goes up in pitch, f_curr=1 < f_prev ∈ {2,3}.
+       Left  hand: note goes DOWN in pitch (mirror), f_prev=1 → f_curr ∈ {2,3}.
+
+    2. CROSS_OVER — descending passage, current finger is 1, next is 2 or 3.
+       A mid-length finger arches over the thumb.
+       Right hand: note goes down in pitch, f_prev=1 → f_curr ∈ {2,3}.
+       Left  hand: note goes UP in pitch (mirror), f_prev ∈ {2,3} → f_curr=1.
+
+    3. IN_FORM — hand stays in position (is_in_position check passes).
+       Note falls within per-finger tolerance of expected position.
+
+    4. RESET — thumb must travel far (> FREE_SHIFT_MM after free zone).
+       A physical repositioning of the entire hand.
+
+    5. STRETCHING — the 'else': note is out of position but closer than RESET
+       threshold. Fingers extend or contract without a full hand move.
+
+    Args:
+        note_prev, f_prev: previous note + finger
+        note_curr, f_curr: current note + finger
+        tracker: HandPositionTracker instance (creates one if None)
+
+    Returns:
+        HandMovementType enum value
+    """
+    from fingering.phrasing.hand_position import HandPositionTracker
+    if tracker is None:
+        tracker = HandPositionTracker()
+
+    hand      = getattr(note_curr, 'hand', 'right')
+    ascending = note_curr.pitch > note_prev.pitch
+
+    # ── 1. Thumb-Under ─────────────────────────────────────────────────────
+    # RH ascending: finger  f_prev ∈ {2,3} → f_curr = 1  (thumb slides under)
+    # LH descending (mirrored): f_prev ∈ {2,3} → f_curr = 1
+    if hand == 'right':
+        is_thumb_under = (ascending and f_curr == 1 and f_prev in (2, 3))
+    else:
+        is_thumb_under = (not ascending and f_curr == 1 and f_prev in (2, 3))
+
+    if is_thumb_under:
+        return HandMovementType.THUMB_UNDER
+
+    # ── 2. Cross-Over ──────────────────────────────────────────────────────
+    # RH descending: f_prev = 1 → f_curr ∈ {2,3}  (finger arches over thumb)
+    # LH ascending (mirrored): f_prev = 1 → f_curr ∈ {2,3}
+    if hand == 'right':
+        is_cross_over = (not ascending and f_prev == 1 and f_curr in (2, 3))
+    else:
+        is_cross_over = (ascending and f_prev == 1 and f_curr in (2, 3))
+
+    if is_cross_over:
+        return HandMovementType.CROSS_OVER
+
+    # ── 3. In-Form ─────────────────────────────────────────────────────────
+    state_prev = tracker.infer(note_prev, f_prev)
+    if state_prev.is_in_position(note_curr, f_curr):
+        return HandMovementType.IN_FORM
+
+    # ── 4. Reset ───────────────────────────────────────────────────────────
+    # Hand must physically reposition (thumb travels beyond free zone)
+    state_curr = tracker.infer(note_curr, f_curr)
+    shift = tracker.shift_cost(state_prev, state_curr)
+    if shift > 0.0:
+        return HandMovementType.RESET
+
+    # ── 5. Stretching ──────────────────────────────────────────────────────
+    # Out of position but no significant thumb travel — fingers extend/contract
+    return HandMovementType.STRETCHING
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

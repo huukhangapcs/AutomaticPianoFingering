@@ -27,7 +27,10 @@ from fingering.phrasing.phrase import Phrase, PhraseIntent
 from fingering.phrasing.pattern_library import apply_pattern_constraints
 from fingering.phrasing.chord_heuristic import build_forced_constraints
 from fingering.phrasing.thumb_placement_planner import apply_thumb_constraints
-from fingering.phrasing.hand_position import HandPositionTracker, apply_five_finger_constraints
+from fingering.phrasing.hand_position import (
+    HandPositionTracker, apply_five_finger_constraints,
+    HandMovementType, classify_movement,
+)
 from fingering.phrasing.position_planner import PositionPlanner
 
 _hand_tracker = HandPositionTracker()   # Stateless, shared instance
@@ -257,9 +260,10 @@ class PhraseScopedDP:
             cost += REGISTER_MISMATCH_COST
         # Phase 2.8: Position anchor reward for first note
         if anchor_mm is not None:
-            from fingering.core.keyboard import physical_key_position_mm, _WHITE_KEY_WIDTH_MM as _WK
+            from fingering.core.keyboard import physical_key_position_mm
+            from fingering.phrasing.hand_position import _FINGER_OFFSET_MM
             hand = getattr(note, 'hand', 'right')
-            off = (finger - 1) * _WK
+            off = _FINGER_OFFSET_MM[finger]
             implied_thumb = (physical_key_position_mm(note.pitch) - off
                              if hand == 'right'
                              else physical_key_position_mm(note.pitch) + off)
@@ -326,7 +330,7 @@ class PhraseScopedDP:
         # ── Phase 3B: Hand position shift cost ───────────────────────────
         # Additional cost for the physical distance the thumb must travel.
         # v2: uses thumb_mm delta — zero for same-position jumps.
-        cost += _hand_tracker.shift_cost(pos_prev, pos_curr)
+        cost += _hand_tracker.shift_cost(pos_prev, pos_curr, f_prev=f_prev, f_curr=f_curr)
 
         # ── Phase 4: Melodic-direction / finger-direction alignment ──────────
         # In ascending passages, increasing finger number is natural (thumb-side to pinky).
@@ -386,63 +390,55 @@ class PhraseScopedDP:
                 # Nguyên tắc 11: ngón dài tự nhiên với phím đen
                 cost += BLACK_KEY_LONG_FINGER_REWARD  # negative = reward
 
-        # --- Ergonomic: crossing ---
-        hand = note_curr.hand
-        crossing = False
-        if ascending and f_curr < f_prev and f_curr != 1:
-            crossing = True
-        if not ascending and f_curr > f_prev and f_prev != 1:
-            crossing = True
-        # For LH: mirror the crossing logic
-        if hand == 'left':
-            crossing = False
-            if not ascending and f_curr < f_prev and f_curr != 1:
-                crossing = True
-            if ascending and f_curr > f_prev and f_prev != 1:
-                crossing = True
-                
-        if crossing:
-            # --- Thumb-Under (Luyền Ngón Luồn) ---
-            # Occurs when the THUMB (f=1) crosses UNDER a higher finger.
-            # Standard technique for ascending scale in RH (or descending LH).
-            # More natural when the thumb will land on a WHITE key.
-            is_thumb_under = (
-                (hand == 'right' and ascending and f_curr == 1)
-                or (hand == 'left' and not ascending and f_curr == 1)
-            )
-            # --- Finger-Over (Vắt Ngón) ---
-            # The opposite: a higher finger (2,3,4) crosses OVER the thumb.
-            # Standard for descending RH (or ascending LH).
-            # Example: RH descending, f_prev=1, f_curr=3 — finger 3 vaults over thumb.
-            is_finger_over = (
-                (hand == 'right' and not ascending and f_prev == 1 and f_curr in (2, 3, 4))
-                or (hand == 'left' and ascending and f_prev == 1 and f_curr in (2, 3, 4))
-            )
+        # ── Movement Classification ────────────────────────────────────────
+        # Classify the transition into one of 5 biomechanical categories and
+        # apply the appropriate cost. This replaces the former scattered
+        # if/elif chain for crossing detection.
+        hand     = note_curr.hand     # needed by STRETCHING branch below
+        movement = classify_movement(note_prev, f_prev, note_curr, f_curr, _hand_tracker)
 
+        if movement == HandMovementType.IN_FORM:
+            # Hand holds position — no crossing cost needed (IN_POSITION_REWARD
+            # already applied above). Natural movement within hand span.
+            pass
+
+        elif movement == HandMovementType.THUMB_UNDER:
+            # Thumb crosses under an active finger (ascending RH / descending LH).
+            # Standard scale technique. Penalise slightly to avoid spam (1-2-1-2);
+            # reward when the interval is large enough to justify it.
+            semitone = abs(note_curr.pitch - note_prev.pitch)
             if note_curr.is_black and f_curr == 1:
-                # Absolute worst case: thumb-under landing on a black key
-                cost += CROSSING_STANDARD + 4.0
-            elif is_thumb_under:
-                cost += CROSSING_THUMB_UNDER
-                # Thumb-under reward cần interval ≥ 3 semitones:
-                # Với 1-2 semitones (half/whole step), crossing là lãng phí —
-                # sequential fingering (1→2→3) hiệu quả hơn.
-                semitone = abs(note_curr.pitch - note_prev.pitch)
-                if not note_curr.is_black and 3 <= semitone <= 6:
-                    cost += THUMB_UNDER_REWARD   # reward! (≤ 4 quá hào phóng)
-                elif semitone <= 2:
-                    cost += SHORT_STEP_CROSSING_PENALTY  # Discourage needless crossing
-            elif is_finger_over:
-                cost += CROSSING_THUMB_UNDER
-                semitone = abs(note_curr.pitch - note_prev.pitch)
-                if not note_curr.is_black and 3 <= semitone <= 6:
-                    cost += FINGER_OVER_REWARD   # reward!
-                elif semitone <= 2:
-                    cost += SHORT_STEP_CROSSING_PENALTY  # Discourage needless crossing
-            elif thumb_crossing_natural(f_prev, f_curr, ascending, hand):
-                cost += CROSSING_THUMB_UNDER  # Standard scale thumb motion
+                cost += CROSSING_STANDARD + 4.0   # Worst case: thumb on black
             else:
-                cost += CROSSING_STANDARD       # Non-standard crossing
+                cost += CROSSING_THUMB_UNDER
+                if not note_curr.is_black and 3 <= semitone <= 6:
+                    cost += THUMB_UNDER_REWARD     # Just-right interval → reward
+                elif semitone <= 2:
+                    cost += SHORT_STEP_CROSSING_PENALTY  # Needless cross on half-step
+
+        elif movement == HandMovementType.CROSS_OVER:
+            # A mid-length finger arches over the thumb (descending RH / ascending LH).
+            # Mirror of thumb-under; same cost structure.
+            semitone = abs(note_curr.pitch - note_prev.pitch)
+            cost += CROSSING_THUMB_UNDER
+            if not note_curr.is_black and 3 <= semitone <= 6:
+                cost += FINGER_OVER_REWARD         # Perfect interval → reward
+            elif semitone <= 2:
+                cost += SHORT_STEP_CROSSING_PENALTY  # Needless cross on minor 2nd
+
+        elif movement == HandMovementType.STRETCHING:
+            # Fingers extend or contract without a full hand reposition.
+            # The span_cost() already applied above via the out-of-position branch.
+            # Add a direction-inconsistency penalty for backwards stretches.
+            if thumb_crossing_natural(f_prev, f_curr, ascending, hand):
+                cost += CROSSING_THUMB_UNDER       # Scale-consistent thumb motion
+            else:
+                cost += CROSSING_STANDARD          # Non-standard crossing
+
+        elif movement == HandMovementType.RESET:
+            # Hand has repositioned — shift_cost() already applied above.
+            # No additional crossing cost; the shift cost captures the movement.
+            pass
 
         # --- Ergonomic: same finger on different pitch (OFOK) ---
         if f_curr == f_prev and note_prev.pitch != note_curr.pitch:
@@ -490,8 +486,9 @@ class PhraseScopedDP:
         # Accumulated over multiple notes → stable positions become "sticky".
         if anchor_curr is not None:
             hand = note_curr.hand
-            from fingering.core.keyboard import physical_key_position_mm, _WHITE_KEY_WIDTH_MM as _WK
-            off = (f_curr - 1) * _WK
+            from fingering.core.keyboard import physical_key_position_mm
+            from fingering.phrasing.hand_position import _FINGER_OFFSET_MM
+            off = _FINGER_OFFSET_MM[f_curr]
             implied_thumb = (physical_key_position_mm(note_curr.pitch) - off
                              if hand == 'right'
                              else physical_key_position_mm(note_curr.pitch) + off)

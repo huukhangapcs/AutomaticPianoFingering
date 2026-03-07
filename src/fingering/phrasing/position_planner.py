@@ -34,13 +34,16 @@ from typing import List, Optional
 
 from fingering.models.note_event import NoteEvent
 from fingering.core.keyboard import physical_key_position_mm, _WHITE_KEY_WIDTH_MM as _WK
+from fingering.phrasing.hand_position import _FINGER_OFFSET_MM, _FINGER_TOLERANCE_MM
 
 # ──────────────────────────────────────────────────────────────────
 # Constants
 # ──────────────────────────────────────────────────────────────────
 
 # Tolerance: how close a note must be to an expected finger position
-# to be considered "covered" by that anchor.  ~0.6 white key.
+# to be considered "covered" by that anchor.
+# Now uses per-finger _FINGER_TOLERANCE_MM from hand_position.py.
+# Kept here as fallback default only.
 _COVERAGE_TOLERANCE_MM = 15.0
 
 # Window sizes to try (largest first → prefer stable long positions)
@@ -165,12 +168,17 @@ class PositionPlanner:
             finger_map, coverage = self._score_anchor(
                 thumb_mm, window, start_idx, hand
             )
-            # Add small penalty for high average finger number
+            if not finger_map:
+                continue
+            # Penalty for high average finger number
             avg_finger_penalty = (
                 sum(_FINGER_PENALTY[f] for f in finger_map.values())
                 / max(1, len(finger_map))
             )
-            score = coverage - avg_finger_penalty * 0.1
+            # Temporal ordering score: reward monotonic/stepwise finger sequences
+            temporal = self._temporal_order_score(finger_map)
+            # Combined score: coverage weighted most, temporal adds quality signal
+            score = coverage * 0.70 + temporal * 0.20 - avg_finger_penalty * 0.10
 
             if score > best_score:
                 best_score = score
@@ -185,6 +193,27 @@ class PositionPlanner:
 
         return best_anchor
 
+    def _temporal_order_score(self, finger_map: dict) -> float:
+        """
+        Score how naturally the finger sequence flows over time.
+
+        Rewards:
+          - Monotonic runs (1→2→3→4→5 or reverse): very natural
+          - Stepwise changes (|Δf| = 1): natural adjacent finger motion
+        Penalises:
+          - Large irregular jumps (e.g. 1→5→2→4): awkward temporal pattern
+
+        Returns a score in [0, 1].
+        """
+        if not finger_map or len(finger_map) < 2:
+            return 1.0
+        fingers = [finger_map[i] for i in sorted(finger_map)]
+        natural = sum(
+            1 for a, b in zip(fingers, fingers[1:])
+            if abs(b - a) <= 2   # stepwise or skip-one = still natural
+        )
+        return natural / (len(fingers) - 1)
+
     def _score_anchor(
         self,
         thumb_mm: float,
@@ -194,6 +223,9 @@ class PositionPlanner:
     ) -> tuple[dict, float]:
         """
         Score an anchor position against the window.
+
+        Uses anatomical finger offsets (_FINGER_OFFSET_MM) and per-finger
+        tolerances (_FINGER_TOLERANCE_MM) for more accurate coverage scoring.
 
         Returns:
             finger_map: {global_note_idx: best_finger} for covered notes
@@ -208,12 +240,14 @@ class PositionPlanner:
             best_f = None
             best_diff = float('inf')
             for f in range(1, 6):
+                offset = _FINGER_OFFSET_MM[f]
                 if hand == 'right':
-                    expected_mm = thumb_mm + (f - 1) * _WK
+                    expected_mm = thumb_mm + offset
                 else:
-                    expected_mm = thumb_mm - (f - 1) * _WK
+                    expected_mm = thumb_mm - offset
                 diff = abs(note_mm - expected_mm)
-                if diff <= _COVERAGE_TOLERANCE_MM and diff < best_diff:
+                tolerance = _FINGER_TOLERANCE_MM[f]   # per-finger tolerance
+                if diff <= tolerance and diff < best_diff:
                     best_diff = diff
                     best_f = f
 

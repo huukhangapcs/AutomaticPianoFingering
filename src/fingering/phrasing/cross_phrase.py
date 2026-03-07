@@ -20,12 +20,23 @@ from fingering.core.keyboard import (
     white_key_span, finger_span_limits, is_ascending
 )
 from fingering.phrasing.phrase import Phrase, ArcType, HandResetType
+from fingering.phrasing.hand_position import HandPositionTracker, _FINGER_OFFSET_MM
 
 # If junction score exceeds this, it's a "crash" — hard constraint
 CRASH_THRESHOLD = 15.0
 
 # Maximum stitch cost allowed for a valid transition
 STITCH_COST_THRESHOLD = 8.0
+
+# ── Lazy Reset Constants ────────────────────────────────────────────
+# If the cheapest continuation cost is within this, skip reset entirely.
+LAZY_CONTINUE_THRESHOLD = 6.0
+
+# Only probe lazy continue when rest is not too long.
+# Beyond this, the hand has been idle long enough that full reset is appropriate.
+LAZY_PROBE_MAX_REST_SEC = 0.60   # ~3 eighth notes at 120 BPM
+
+_tracker = HandPositionTracker()
 
 
 class CrossPhraseStitch:
@@ -43,28 +54,41 @@ class CrossPhraseStitch:
         phrase_a: Phrase,
         phrase_b: Phrase,
         fingering_a: List[int],
+        rest_sec: float = 0.0,
     ) -> Dict:
         """
         Given fingering for phrase_a, return a dict describing which
         first fingers are viable for phrase_b.
+
+        Args:
+            rest_sec: Duration of rest/gap between phrases in seconds.
+                      Used to decide whether to attempt lazy continuation.
 
         Returns:
           {
             'allowed_first_fingers': [1, 2, 3, ...],
             'preferred_first_finger': int | None,
             'is_junction_crash': bool,
+            'lazy_continued': bool,   # NEW: True if we skipped reset
           }
         """
         if not fingering_a or not phrase_a.notes or not phrase_b.notes:
             return self._unconstrained()
 
-        # ── 3-way reset dispatch ──────────────────────────────────────
-        # Reset type tells us how much physical freedom exists between phrases.
+        # ── FULL reset check FIRST ─────────────────────────────────────────
+        # FULL = long rest → hand is fully free. Lazy probe must NOT override this.
         if phrase_b.reset_type == HandResetType.FULL:
-            # Long rest: hand can land anywhere — no stitch penalty
             return self._unconstrained()
+
+        # ── Lazy Probe: Try-Continue-First (short non-zero rest only) ─────────
+        # rest_sec=0 means legato → skip to normal NONE path.
+        if 0.0 < rest_sec < LAZY_PROBE_MAX_REST_SEC:
+            lazy_result = self._try_lazy_continue(phrase_a, phrase_b, fingering_a)
+            if lazy_result is not None:
+                return lazy_result
+
+        # ── SOFT dispatch ────────────────────────────────────────────────────
         if phrase_b.reset_type == HandResetType.SOFT:
-            # Short rest or held note: relax stitch, but still guide the DP
             return self._soft_constrained(phrase_a, phrase_b, fingering_a)
 
         last_finger = fingering_a[-1]
@@ -83,13 +107,9 @@ class CrossPhraseStitch:
 
         is_crash = len(allowed) == 0
 
-        # If crash, relax to 3 best options regardless
         if is_crash:
             allowed = sorted(costs, key=costs.get)[:3]
 
-        # Preferred = minimum of (junction_cost + lookahead_cost)
-        # Lookahead: evaluate how well each first_finger sets up the
-        # NEXT 3 notes of phrase_b (not just the first note).
         lookahead_costs: dict[int, float] = {}
         for f_start in allowed:
             la = self._lookahead_cost(phrase_b, f_start, n_notes=3)
@@ -102,6 +122,78 @@ class CrossPhraseStitch:
             'preferred_first_finger': preferred,
             'is_junction_crash': is_crash,
             'junction_costs': costs,
+            'lazy_continued': False,
+        }
+
+    def _try_lazy_continue(
+        self,
+        phrase_a: Phrase,
+        phrase_b: Phrase,
+        fingering_a: List[int],
+    ) -> Optional[Dict]:
+        """
+        Lazy Reset Probe: can we skip the reset and continue naturally?
+
+        Strategy:
+          1. Infer the hand state from the last note of phrase_a.
+          2. For each possible first finger of phrase_b, compute junction cost
+             using HandState mm-based shift cost (anatomically accurate).
+          3. If the minimum junction cost ≤ LAZY_CONTINUE_THRESHOLD, the hand
+             can flow naturally into phrase_b without repositioning.
+             Return a tight constraint favouring those cheap continuations.
+          4. If stuck (all costs > threshold), return None → caller falls
+             back to FULL/SOFT reset logic.
+
+        Pianist analogy: after an 8th-note rest, a pianist doesn't necessarily
+        lift and replant the hand — if the next note is close to the current
+        hand position, they simply reach for it. Only when it's far away do
+        they physically reposition.
+        """
+        if not fingering_a or not phrase_a.notes or not phrase_b.notes:
+            return None
+
+        last_f     = fingering_a[-1]
+        last_note  = phrase_a.notes[-1]
+        first_note = phrase_b.notes[0]
+
+        # Infer current hand state from last note + last finger
+        prev_state = _tracker.infer(last_note, last_f)
+
+        costs: Dict[int, float] = {}
+        for f_start in range(1, 6):
+            # Physical cost: how far does thumb need to travel?
+            next_state = _tracker.infer(first_note, f_start)
+            shift = _tracker.shift_cost(prev_state, next_state,
+                                        f_prev=last_f, f_curr=f_start)
+
+            # Black-key penalty on first note with thumb
+            bk = 3.0 if (first_note.is_black and f_start == 1) else 0.0
+
+            # OFOK: same finger on different pitch
+            ofok = 8.0 if (f_start == last_f and first_note.pitch != last_note.pitch) else 0.0
+
+            costs[f_start] = shift + bk + ofok
+
+        min_cost = min(costs.values())
+
+        if min_cost > LAZY_CONTINUE_THRESHOLD:
+            # Too expensive to continue — let normal reset logic handle it
+            return None
+
+        # Continuation is cheap — prefer fingers within the threshold
+        allowed = [f for f, c in costs.items() if c <= LAZY_CONTINUE_THRESHOLD]
+
+        # Lookahead score to pick the best among cheap continuations
+        la_costs = {f: costs[f] + self._lookahead_cost(phrase_b, f, n_notes=3)
+                    for f in allowed}
+        preferred = min(allowed, key=la_costs.get) if allowed else None
+
+        return {
+            'allowed_first_fingers': allowed,
+            'preferred_first_finger': preferred,
+            'is_junction_crash': False,
+            'junction_costs': costs,
+            'lazy_continued': True,   # Flag: no physical reset was performed
         }
 
     def preferred_end_finger(
@@ -262,6 +354,7 @@ class CrossPhraseStitch:
             'preferred_first_finger': preferred,
             'is_junction_crash': False,   # Soft reset never counts as crash
             'junction_costs': costs,
+            'lazy_continued': False,
         }
 
     def _unconstrained(self) -> Dict:
@@ -270,4 +363,5 @@ class CrossPhraseStitch:
             'preferred_first_finger': None,
             'is_junction_crash': False,
             'junction_costs': {f: 0.0 for f in range(1, 6)},
+            'lazy_continued': False,
         }
