@@ -240,6 +240,6 @@ def _assign_chord_members(
 
 def solve_file(musicxml_path: str) -> List[Tuple[NoteEvent, int]]:
     """Parse + solve trong 1 lần gọi."""
-    from src.musicxml_parser import parse_rh_notes
-    notes, divisions, tempo = parse_rh_notes(musicxml_path)
+    from src.musicxml_parser import parse_hand_notes
+    notes, divisions, tempo = parse_hand_notes(musicxml_path)
     return solve(notes, divisions)

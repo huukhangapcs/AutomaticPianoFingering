@@ -13,7 +13,7 @@ from collections import defaultdict
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-from src.musicxml_parser import parse_rh_notes, get_primary_notes
+from src.musicxml_parser import parse_hand_notes, get_primary_notes
 from src.fingering_solver import solve
 
 
@@ -23,7 +23,7 @@ def evaluate(input_path: str) -> dict:
     Returns:
         dict chứa các metrics: match_rate, off_by_one_rate, per_measure
     """
-    notes, divisions, tempo = parse_rh_notes(input_path)
+    notes, divisions, tempo = parse_hand_notes(input_path)
     assignments = solve(notes, divisions)
 
     # Chỉ evaluate primary notes có ground-truth

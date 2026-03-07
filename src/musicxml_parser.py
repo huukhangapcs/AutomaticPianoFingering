@@ -63,8 +63,11 @@ class ChordGroup:
 # Parser
 # ---------------------------------------------------------------------------
 
-def parse_rh_notes(musicxml_path: str) -> tuple[List[NoteEvent], int, int]:
-    """Parse MusicXML, trả về danh sách NoteEvent tay phải.
+def parse_hand_notes(musicxml_path: str, staff_id: int = 1) -> tuple[List[NoteEvent], int, int]:
+    """Parse MusicXML, trả về danh sách NoteEvent theo staff_id.
+    
+    staff_id = 1: Tay phải (Right Hand).
+    staff_id = 2: Tay trái (Left Hand). Trục X sẽ bị đảo ngược (-X) để tương thích với giải phẫu học của model Viterbi tay phải.
 
     Returns:
         (notes, divisions, tempo)
@@ -125,9 +128,9 @@ def parse_rh_notes(musicxml_path: str) -> tuple[List[NoteEvent], int, int]:
                         local_cursor += int(dur.text) if dur is not None else 0
                     continue
 
-                # Only right hand: staff=1
+                # Filter by staff_id
                 staff_elem = elem.find('staff')
-                if staff_elem is not None and staff_elem.text != '1':
+                if staff_elem is not None and staff_elem.text != str(staff_id):
                     # still advance cursor for non-chord notes
                     dur_elem = elem.find('duration')
                     if elem.find('chord') is None and dur_elem is not None:
@@ -160,8 +163,9 @@ def parse_rh_notes(musicxml_path: str) -> tuple[List[NoteEvent], int, int]:
                     onset = measure_division + local_cursor
                     local_cursor += duration
 
-                # Coordinate
-                x = pitch_to_coord(step, octave, alter)
+                # Coordinate: Mirror X for Left Hand (staff_id = 2)
+                base_x = pitch_to_coord(step, octave, alter)
+                x = -base_x if staff_id == 2 else base_x
                 black = is_black_key(step, alter)
 
                 # Ground-truth fingering

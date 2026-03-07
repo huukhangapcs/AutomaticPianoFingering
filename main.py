@@ -12,7 +12,6 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-from src.musicxml_parser import parse_rh_notes
 from src.fingering_solver import solve
 from src.musicxml_writer import inject_fingering
 
@@ -28,26 +27,35 @@ def main():
         sys.exit(1)
 
     print(f"📄 Parsing: {args.input}")
-    notes, divisions, tempo = parse_rh_notes(args.input)
-    print(f"   → {len(notes)} notes (RH), divisions={divisions}, tempo={tempo}")
+    from src.musicxml_parser import parse_hand_notes
+    from src.musicxml_writer import sparsify_assignments
+    
+    # Process Right Hand (staff=1)
+    notes_rh, div_rh, tempo_rh = parse_hand_notes(args.input, staff_id=1)
+    print(f"   → RH: {len(notes_rh)} notes, divisions={div_rh}, tempo={tempo_rh}")
+    
+    # Process Left Hand (staff=2)
+    notes_lh, div_lh, tempo_lh = parse_hand_notes(args.input, staff_id=2)
+    print(f"   → LH: {len(notes_lh)} notes, divisions={div_lh}, tempo={tempo_lh}")
 
     print("🎹 Solving fingering (Viterbi DP)...")
-    assignments = solve(notes, divisions)
-    print(f"   → {len(assignments)} assignments")
+    assign_rh = solve(notes_rh, div_rh) if notes_rh else []
+    assign_lh = solve(notes_lh, div_lh) if notes_lh else []
+    
+    print(f"   → RH raw assignments: {len(assign_rh)}")
+    print(f"   → LH raw assignments: {len(assign_lh)}")
 
-    # Print preview
-    from src.musicxml_parser import get_primary_notes
-    primaries = get_primary_notes(notes)
-    print(f"\n{'Measure':>7} {'Note':>6} {'x':>6} {'Predict':>8} {'GT':>4}")
-    print("-" * 40)
-    for note, finger in assignments:
-        if note.chord_rank == 0:
-            gt_str = str(note.gt_finger) if note.gt_finger else ' -'
-            match = '✓' if note.gt_finger == finger else '✗'
-            print(f"{note.measure:>7} {note.step}{note.octave:>5} {note.x:>6.1f} "
-                  f"{finger:>8} {gt_str:>4} {match}")
+    # Sparsify (Filter obvious fingerings)
+    sparse_rh = sparsify_assignments(assign_rh, is_lh=False)
+    sparse_lh = sparsify_assignments(assign_lh, is_lh=True)
+    
+    print(f"   → RH sparse markers : {len(sparse_rh)}")
+    print(f"   → LH sparse markers : {len(sparse_lh)}")
 
-    inject_fingering(args.input, assignments, args.output)
+    # Combine
+    combined_assignments = sparse_rh + sparse_lh
+
+    inject_fingering(args.input, combined_assignments, args.output)
 
 
 if __name__ == '__main__':
