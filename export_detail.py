@@ -94,8 +94,8 @@ def _detect_move_type(
 # ─────────────────────────────────────────────────────────────────────────────
 
 def export_detail(input_path: str, output_path: str):
-    notes, divisions, tempo = parse_hand_notes(input_path)
-    assignments = solve(notes, divisions)
+    notes, divisions, tempo = parse_hand_notes(input_path, staff_id=1)
+    assignments = solve(notes, divisions, tempo, is_lh=False)
 
     # Chỉ lấy primary notes (chord_rank=0)
     primary_assignments = [(n, f) for n, f in assignments if n.chord_rank == 0]

@@ -23,8 +23,8 @@ def evaluate(input_path: str) -> dict:
     Returns:
         dict chứa các metrics: match_rate, off_by_one_rate, per_measure
     """
-    notes, divisions, tempo = parse_hand_notes(input_path)
-    assignments = solve(notes, divisions)
+    notes, divisions, tempo = parse_hand_notes(input_path, staff_id=1)
+    assignments = solve(notes, divisions, tempo, is_lh=False)
 
     # Chỉ evaluate primary notes có ground-truth
     results = [(note, finger) for note, finger in assignments

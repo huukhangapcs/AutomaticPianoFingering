@@ -72,14 +72,18 @@ def is_black_key(step: str, alter: float = 0.0) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Span Tables (tay phải, bàn tay adult trung bình)
+# Span Tables (tay phải, bàn tay adult trung bình cỡ 7-7.5 inch)
 # ---------------------------------------------------------------------------
 # Adjacent finger pairs: (1-2), (2-3), (3-4), (4-5)
 # Index 0 = cặp 1-2, index 1 = cặp 2-3, ...
+# Đơn vị: số phím trắng (1.0 = 1 white key = 23.5mm)
 
-MIN_SPAN:  list[float] = [0.5, 0.5, 0.5, 0.5]   # co tối đa
-COMF_SPAN: list[float] = [2.0, 1.5, 1.5, 1.5]   # thoải mái
-MAX_SPAN:  list[float] = [4.5, 2.5, 2.5, 2.0]   # duỗi tối đa
+MIN_SPAN:  list[float] = [0.5, 0.5,  0.5,  0.5 ]  # co tối đa
+COMF_SPAN: list[float] = [2.0, 1.5,  1.5,  1.5 ]  # thoải mái (medium adult hand, giữ nguyên)
+MAX_SPAN:  list[float] = [5.0, 2.5,  2.0,  1.8 ]  # duỗi tối đa (pinky pair tighter: 2.0→1.8)
+
+# Penalty constants cho 3D Biomechanics
+MOMENTUM_PEN = 8.0  # [Fix4] HAND_SHIFT ở tempo cao
 
 
 # ---------------------------------------------------------------------------

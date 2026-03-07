@@ -39,8 +39,8 @@ def main():
     print(f"   → LH: {len(notes_lh)} notes, divisions={div_lh}, tempo={tempo_lh}")
 
     print("🎹 Solving fingering (Viterbi DP)...")
-    assign_rh = solve(notes_rh, div_rh) if notes_rh else []
-    assign_lh = solve(notes_lh, div_lh) if notes_lh else []
+    assign_rh = solve(notes_rh, div_rh, tempo_rh, is_lh=False) if notes_rh else []
+    assign_lh = solve(notes_lh, div_lh, tempo_lh, is_lh=True) if notes_lh else []
     
     print(f"   → RH raw assignments: {len(assign_rh)}")
     print(f"   → LH raw assignments: {len(assign_lh)}")

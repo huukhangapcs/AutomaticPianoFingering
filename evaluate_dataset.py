@@ -62,7 +62,7 @@ def parse_dataset_txt(filepath: str) -> list[NoteEvent]:
             dur_sec = float(parts[2]) - onset_sec
             dur_div = int(dur_sec * 1000)
             
-            x = pitch_to_coord(step, octave, alter)
+            x, y, z = pitch_to_coord(step, octave, alter)
             is_black = is_black_key(step, alter)
             
             raw_finger = parts[7]
@@ -79,6 +79,8 @@ def parse_dataset_txt(filepath: str) -> list[NoteEvent]:
                 octave=octave,
                 alter=alter,
                 x=x,
+                y=y,
+                z=z,
                 is_black=is_black,
                 duration=dur_div,
                 onset_division=onset_div,
@@ -121,7 +123,7 @@ def evaluate_dataset(dataset_dir: str):
                 continue
                 
             # Simulate divisions (using 1000 as we converted seconds to ms)
-            assignments = solve(notes, divisions=1000)
+            assignments = solve(notes, divisions=1000, is_lh=False)
             
             results = [(note, finger) for note, finger in assignments
                        if note.chord_rank == 0 and note.gt_finger is not None]

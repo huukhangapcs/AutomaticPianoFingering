@@ -261,7 +261,14 @@ def solve(
                     move_type=move_type,
                     f_prev=f_prev,
                 )
-                
+
+                # --- Fix 4: Gia tốc Chuyển Nốt (Tempo-Aware Momentum) ---
+                # HAND_SHIFT ở tốc độ cao (< 150ms) là gần như bất khả thi về vật lý.
+                if move_type == MoveType.HAND_SHIFT and tempo > 0 and divisions > 0:
+                    time_between = (note.onset_division - prev_note.onset_division) / divisions * 60.0 / tempo
+                    if time_between < 0.15:  # Dưới 150ms: quán tính cánh tay không cho nhảy kịp
+                        cost += 8.0
+
                 # --- Mới: Cộng dồn Phase-Peak Gravity Penalty (nếu có) ---
                 if not is_lh:
                     cost += lookahead_penalties[i][f_curr]
