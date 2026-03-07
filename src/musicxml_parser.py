@@ -23,13 +23,15 @@ from src.physics_model import pitch_to_coord, is_black_key
 
 @dataclass
 class NoteEvent:
-    """Một nốt nhạc tay phải đã được enrich với tọa độ vật lý."""
+    """Một nốt nhạc tay phải đã được enrich với tọa độ vật lý 3D."""
     note_id: str                   # "m{measure}_n{idx}"
     measure: int
     step: str                      # 'C'..'B'
     octave: int
     alter: float                   # -1=flat, 0=natural, +1=sharp
-    x: float                       # keyboard coordinate
+    x: float                       # keyboard width coordinate (mm)
+    y: float                       # key height (0 for white, +12 for black)
+    z: float                       # key depth into fallboard (0 for white, +50 for black)
     is_black: bool
     duration: int                  # in divisions
     onset_division: int            # tích lũy từ đầu bài (để sort)
@@ -164,7 +166,7 @@ def parse_hand_notes(musicxml_path: str, staff_id: int = 1) -> tuple[List[NoteEv
                     local_cursor += duration
 
                 # Coordinate: Mirror X for Left Hand (staff_id = 2)
-                base_x = pitch_to_coord(step, octave, alter)
+                base_x, y, z = pitch_to_coord(step, octave, alter)
                 x = -base_x if staff_id == 2 else base_x
                 black = is_black_key(step, alter)
 
@@ -184,6 +186,8 @@ def parse_hand_notes(musicxml_path: str, staff_id: int = 1) -> tuple[List[NoteEv
                     octave=octave,
                     alter=alter,
                     x=x,
+                    y=y,
+                    z=z,
                     is_black=black,
                     duration=duration,
                     onset_division=onset,

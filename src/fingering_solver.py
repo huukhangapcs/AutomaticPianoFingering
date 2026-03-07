@@ -254,8 +254,12 @@ def solve(
                     s_curr=s_curr,
                     f_curr=f_curr,
                     note_curr_x=note.x,
-                    note_curr_is_black=note.is_black,
+                    note_curr_y=note.y,
+                    note_curr_z=note.z,
+                    note_prev_x=prev_note.x,
+                    note_prev_y=prev_note.y,
                     move_type=move_type,
+                    f_prev=f_prev,
                 )
                 
                 # --- Mới: Cộng dồn Phase-Peak Gravity Penalty (nếu có) ---

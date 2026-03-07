@@ -33,8 +33,14 @@ BLACK_KEYS: set[tuple[str, float]] = {
 }
 
 
-def pitch_to_coord(step: str, octave: int, alter: float = 0.0) -> float:
-    """Chuyển pitch thành tọa độ thực trên trục bàn phím.
+from typing import Tuple
+
+def pitch_to_coord(step: str, octave: int, alter: float = 0.0) -> Tuple[float, float, float]:
+    """Chuyển pitch thành hệ tọa độ 3D trừu tượng trên bàn phím piano.
+
+    Trục X: Đơn vị là số lượng phím trắng (1 phím trắng = 1.0)
+    Trục Y: Chiều cao. Phím trắng = 0.0, Phím đen = 0.5 (Tương đối so với bề rộng phím trắng)
+    Trục Z: Chiều sâu. Phím trắng = 0.0, Phím đen = 2.0 (Phím đen lùi sâu vào gấp đôi bề rộng phím trắng)
 
     Args:
         step:   Tên nốt ('C'..'B')
@@ -42,10 +48,22 @@ def pitch_to_coord(step: str, octave: int, alter: float = 0.0) -> float:
         alter:  -1.0=flat, 0.0=natural, +1.0=sharp
 
     Returns:
-        Tọa độ x (float), phím đen ở x + 0.5 so với phím trắng bên trái.
+        (x, y, z) in abstract key units.
     """
-    base = octave * 7 + WHITE_KEY_OFFSET[step.upper()]
-    return base + alter * 0.5
+    base_x = octave * 7 + WHITE_KEY_OFFSET[step.upper()]
+    
+    is_black = is_black_key(step, alter)
+    if is_black:
+        # Phím đen nằm nhích sang phải (hoặc trái) nửa phím trắng
+        x = base_x + alter * 0.5
+        y = 0.5
+        z = 2.0
+    else:
+        x = float(base_x)
+        y = 0.0
+        z = 0.0
+        
+    return x, y, z
 
 
 def is_black_key(step: str, alter: float = 0.0) -> bool:
@@ -283,26 +301,22 @@ def transition_cost(
     s_curr: HandState,
     f_curr: int,
     note_curr_x: float,
-    note_curr_is_black: bool,
+    note_curr_y: float,
+    note_curr_z: float,
+    note_prev_x: float,
+    note_prev_y: float,
     move_type: MoveType,
+    f_prev: int,
 ) -> float:
-    """Tổng soft cost của transition.
-
-    Args:
-        s_prev:              HandState trước khi chơi nốt hiện tại
-        s_curr:              HandState sau khi ngón f_curr chơi nốt
-        f_curr:              Ngón đang chơi (1-5)
-        note_curr_x:         Tọa độ nốt hiện tại
-        note_curr_is_black:  True nếu là phím đen
-        move_type:           Loại di chuyển đã phân loại
-
-    Returns:
-        Chi phí (float, nhỏ hơn = tốt hơn)
+    """Tổng soft cost của transition với Hình học Không Gian 3D.
+    
+    Y: Height (0=Trắng, +12=Đen)
+    Z: Depth (0=Cạnh ngoài, +50=Cắm sâu vào trong)
     """
     cost = 0.0
 
     # [A] Movement cost: ngón f_curr di chuyển bao nhiêu?
-    f_idx = f_curr - 1  # 0-indexed
+    f_idx = f_curr - 1
     delta = abs(s_curr.pos[f_idx] - s_prev.pos[f_idx])
     cost += MOVEMENT_WEIGHT * delta
 
@@ -312,18 +326,33 @@ def transition_cost(
     # [C] Movement type base cost
     cost += MOVE_TYPE_COST[move_type]
 
-    # [D] Key color penalty
-    if note_curr_is_black:
+    # [D] 3D Biomechanics - Trục Z (Deep Narrow Obstruction)
+    # Ngón 1 và 5 rất to. Nếu tay đang lùi sâu vào Z (đang bấm phím đen) mà phải bấm phím trắng ngay sát bên cạnh, 
+    # ngón cái/út sẽ bị kẹt vào khe hẹp giữa 2 phím đen.
+    if f_curr in (1, 5) and note_curr_y == 0.0:
+        if note_prev_y > 0.0 and abs(note_curr_x - note_prev_x) <= 1.0:
+            cost += 3.0 # Phạt mức độ vừa phải (ít hơn nhấn lên phím đen)
+        
+    # [D2] Key color/elevation penalty (Ngón 1 và 5 trên phím đen Y=0.5)
+    if note_curr_y > 0.0:
         if f_curr == 1:
             cost += THUMB_BLACK_PEN
         elif f_curr == 5:
             cost += PINKY_BLACK_PEN
 
+    # [D3] 3D Biomechanics - Trục Y (Thumb Under Clearance)
+    # Lòn ngón cái dưới ngón gác trên phím đen (Y=0.5) có nhiều không gian (Clearance) hơn phím trắng (Y=0.0).
+    if move_type in (MoveType.THUMB_UNDER, MoveType.CROSS_OVER):
+        if note_curr_y == 0.0 and note_prev_y == 0.0:
+            # Phạt rất nhẹ (Tie-breaker) để hơi nghiêng về việc vắt qua phím đen nếu có thể
+            cost += 0.2
+        elif note_curr_y == 0.0 and note_prev_y > 0.0:
+            # Thưởng nhẹ nếu vắt qua phím đen thành công (Rất thoải mái)
+            cost -= 0.2
+
     # [E] Inertia: penalize dịch chuyển trọng tâm bàn tay
     centroid_shift = abs(s_curr.centroid() - s_prev.centroid())
     cost += INERTIA_WEIGHT * centroid_shift
-
-    # [F] Removed Finger index soft penalty to allow high extensions (4/5)
     
     return cost
 
