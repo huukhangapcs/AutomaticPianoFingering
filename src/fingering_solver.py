@@ -53,7 +53,8 @@ def _initial_costs(note: NoteEvent) -> dict[int, Tuple[float, HandState]]:
 def solve(
     all_notes: List[NoteEvent],
     divisions: int,
-    tempo: float = 120.0
+    tempo: float = 120.0,
+    is_lh: bool = False
 ) -> List[Tuple[NoteEvent, int]]:
     """Gán ngón tay tối ưu cho toàn bộ notes tay phải.
 
@@ -61,6 +62,8 @@ def solve(
         all_notes:  Tất cả NoteEvent (kể cả chord members)
         divisions:  Số division per quarter note
         tempo:      BPM (Beats per minute)
+        is_lh:      Tay trái hay phải (True = Tay trái -> Kích hoạt Pattern Lock, False = Tay Phải -> Kích hoạt Lookahead)
+
 
     Returns:
         List[(NoteEvent, finger)] cho TẤT CẢ notes
@@ -97,6 +100,61 @@ def solve(
     prev_dur = primaries[0].duration
     prev_is_rest = False
 
+    # --- Pre-processing: Mẫu Tay Trái (LHS Pattern Matching) ---
+    locked_fingers: dict[int, int] = {}
+    if is_lh:
+        from src.pattern_library import identify_and_lock_patterns
+        locked_fingers = identify_and_lock_patterns(primaries)
+        # Lock first note if it's part of a pattern
+        if 0 in locked_fingers:
+            req_f = locked_fingers[0]
+            for f in range(1, 6):
+                if f != req_f:
+                    dp_curr[f] = (INF, HandState.snap(primaries[0].x, f))
+
+    # --- Pre-processing: Phase-Peak Lookahead (RHS Gravity Penalty) ---
+    lookahead_penalties: dict[int, dict[int, float]] = {i: {f: 0.0 for f in range(1, 6)} for i in range(N)}
+    if not is_lh:
+        # Step 1: Phân tách bản nhạc thành các Phrases bằng `is_reset_point`
+        phrases: List[List[int]] = []
+        curr_phrase = [0]
+        
+        for i in range(1, N):
+            p_note = primaries[i]
+            prev = primaries[i-1]
+            if is_reset_point(prev.duration, divisions, prev_is_rest, tempo, prev.x, p_note.x):
+                phrases.append(curr_phrase)
+                curr_phrase = [i]
+            else:
+                curr_phrase.append(i)
+        if curr_phrase:
+            phrases.append(curr_phrase)
+            
+        # Step 2 & 3: Tìm Đỉnh (Peak) trong mỗi Phrase và Gắn Trọng lực dội ngược
+        for phrase in phrases:
+            if len(phrase) < 4:
+                continue # Bỏ qua câu quá ngắn
+                
+            # Tìm note cao nhất trên trục X
+            peak_idx = max(phrase, key=lambda idx: primaries[idx].x)
+            peak_x = primaries[peak_idx].x
+            
+            # Decay Function: Bắn ngược penalty cho ngón 5 (để dành ngón 5 cho đỉnh)
+            # Phạm vi ảnh hưởng: 5 notes trước đỉnh
+            for step_back in range(1, 4):
+                target_idx = peak_idx - step_back
+                if target_idx not in phrase:
+                    break
+                    
+                # Chỉ phạt các đoạn đi lên dốc tới đỉnh (Ascending)
+                if primaries[target_idx].x < peak_x:
+                    # Decay mũ: 5.0 -> 1.66 -> 0.55
+                    penalty = 5.0 / (3 ** (step_back - 1))
+                    
+                    # Phạt ngón 5 (và ngón 4) nếu xài sớm
+                    lookahead_penalties[target_idx][5] += penalty
+                    lookahead_penalties[target_idx][4] += penalty * 0.4
+
     # Precompute chord dict for fast lookup: onset_division -> list of note.x
     chord_xs_by_onset: dict[int, List[float]] = {}
     for n in all_notes:
@@ -128,6 +186,12 @@ def solve(
             max_chord_span = max(current_chord_xs) - min(current_chord_xs)
 
         for f_curr in range(1, 6):
+        
+            # --- Mới: Pattern Bypass ---
+            # Nếu index i của nốt hiện tại đã bị hard-lock bởi Pattern Library
+            if is_lh and i in locked_fingers:
+                if f_curr != locked_fingers[i]:
+                    continue # Bỏ qua hoàn toàn nhánh ngón tay này
         
             # Kiểm tra nếu f_curr cho nốt đỉnh kết hợp với bề rộng hợp âm vượt quá sải tay con người.
             # Giả định nốt dưới cùng do ngón 5 (hoặc ngón 1 cho tay trái) phụ trách. COMF_SPAN * 2.5 ~ MAX SPAN thực tế.
@@ -193,7 +257,12 @@ def solve(
                     note_curr_is_black=note.is_black,
                     move_type=move_type,
                 )
+                
+                # --- Mới: Cộng dồn Phase-Peak Gravity Penalty (nếu có) ---
+                if not is_lh:
+                    cost += lookahead_penalties[i][f_curr]
 
+                # Update nếu đường đi này tốt hơn
                 if cost < dp_next[f_curr][0]:
                     dp_next[f_curr] = (cost, s_curr)
                     bt_next[f_curr] = f_prev
@@ -274,8 +343,9 @@ def _assign_chord_members(
 # Convenience wrapper
 # ---------------------------------------------------------------------------
 
-def solve_file(musicxml_path: str) -> List[Tuple[NoteEvent, int]]:
+def solve_file(musicxml_path: str, is_lh: bool = False) -> List[Tuple[NoteEvent, int]]:
     """Parse + solve trong 1 lần gọi."""
     from src.musicxml_parser import parse_hand_notes
-    notes, divisions, tempo = parse_hand_notes(musicxml_path)
-    return solve(notes, divisions, tempo)
+    staff_id = 2 if is_lh else 1
+    notes, divisions, tempo = parse_hand_notes(musicxml_path, staff_id)
+    return solve(notes, divisions, tempo, is_lh)
